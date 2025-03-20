@@ -1,5 +1,4 @@
-Machine meta layer for Yocto Project
-=========================================
+# Machine meta layer for Yocto Project
 
 ## Supported hardware
 - [x] Radxa Rock 5B+
