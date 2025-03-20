@@ -1,0 +1,22 @@
+Machine meta layer for Yocto Project
+=========================================
+
+## Supported hardware
+- [x] Radxa Rock 5B+
+- [ ] Radxa Zero 3E
+
+
+## Dependencies
+
+  Layer: OECORE
+  URI: https://github.com/openembedded/openembedded-core.git
+
+  Layer: BITBAKE
+  URI: https://github.com/openembedded/bitbake.git
+
+  Layer: ARM
+  URI: https://git.yoctoproject.org/meta-arm
+
+  Layer: ROCKCHIP
+  URI: https://git.yoctoproject.org/meta-rockchip
+
