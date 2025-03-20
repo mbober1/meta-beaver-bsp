@@ -24,8 +24,8 @@ SRC_URI = " \
 DEPENDS += "lzop-native"
 FIT_KERNEL_COMP_ALG ?= "lzo"
 FIT_KERNEL_COMP_ALG_EXTENSION ?= ".lzo"
+LINUX_KERNEL_TYPE = "preempt-rt"
 
-COMPATIBLE_MACHINE:rock-5b-plus = "rock-5b-plus"
 COMPATIBLE_MACHINE:luckfox-lyra = "luckfox-lyra"
 
 #KERNEL_DTC_FLAGS += "-@ -H epapr"
