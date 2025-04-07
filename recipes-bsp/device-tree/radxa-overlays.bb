@@ -10,6 +10,7 @@ SRC_URI = "	\
 
 COMPATIBLE_MACHINE:rock-5b-plus = "rock-5b-plus"
 
+PROVIDES = "virtual/dtb"
 
 S = "${WORKDIR}/git"
 

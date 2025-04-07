@@ -5,6 +5,7 @@ SRC_URI:append = "\
 	file://bootcmd.cfg \
 	file://decompression.cfg \
 	file://quickstart.cfg \
+	file://rock-5b-plus-nvme.patch \
 "
 
 BRANCH = "rk3588"

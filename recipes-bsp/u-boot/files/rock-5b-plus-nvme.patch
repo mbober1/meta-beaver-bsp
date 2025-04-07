@@ -1,0 +1,57 @@
+From 34347d83ad8c553ee61fa43456e3b9e42ce71aac Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Sun, 23 Mar 2025 18:48:21 +0000
+Subject: [PATCH] arm: dts: arm: dts: rockchip: rock-5b-plus: add support for
+ PCIe3 and NVMe
+Upstream-Status: Inappropriate
+---
+ arch/arm/dts/rk3588-rock-5b-u-boot.dtsi | 36 +++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm/dts/rk3588-rock-5b-u-boot.dtsi b/arch/arm/dts/rk3588-rock-5b-u-boot.dtsi
+index d51fbf51cb8..4be5f6465c0 100644
+--- a/arch/arm/dts/rk3588-rock-5b-u-boot.dtsi
++++ b/arch/arm/dts/rk3588-rock-5b-u-boot.dtsi
+@@ -75,3 +75,39 @@
+ 	maximum-speed = "high-speed";
+ 	status = "okay";
+ };
++
++&pcie30phy {
++	status = "okay";
++	data-lanes = <1 1 2 2>;
++};
++
++&pcie3x2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcie3x2_rst>;
++	reset-gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
++	vpcie3v3-supply = <&vcc3v3_pcie30>;
++	status = "okay";
++};
++
++&pcie3x4 {
++	num-lanes = <2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcie3_rst>;
++	reset-gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
++	vpcie3v3-supply = <&vcc3v3_pcie30>;
++	status = "okay";
++};
++
++&pinctrl {
++	pcie3 {
++		pcie3x2_rst: pcie3x2-rst {
++			rockchip,pins = <4 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb {
++		vcc5v0_host_en: vcc5v0-host-en {
++			rockchip,pins = <1 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
+-- 
+2.34.1
+

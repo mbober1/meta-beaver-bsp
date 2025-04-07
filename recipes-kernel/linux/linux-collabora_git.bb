@@ -23,7 +23,6 @@ LINUX_KERNEL_TYPE = "preempt-rt"
 
 COMPATIBLE_MACHINE:rock-5b-plus = "rock-5b-plus"
 
-#KERNEL_DTC_FLAGS += "-@ -H epapr"
 
 inherit kernel
 inherit kernel-yocto
