@@ -1,0 +1,7 @@
+# Partition layout for NVME booting
+# Contains only two copies of root filesystems
+
+part /         --label rootfsA --active           --fstype=ext4 --part-name rootfsA   --source rootfs  --part-type ${ROOT_DPS} --size=1536
+part /         --label rootfsB                    --fstype=ext4 --part-name rootfsB   --source rootfs  --part-type ${ROOT_DPS} --size=1536
+
+bootloader --ptable gpt

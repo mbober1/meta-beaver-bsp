@@ -8,11 +8,11 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 KERNEL_VERSION_SANITY_SKIP="1"
 LINUX_VERSION = "6.13+"
 BRANCH = "rock5b-plus"
-SRCREV = "${AUTOREV}"
-SRCPV = "${@bb.fetch2.get_srcrev(d)}"
+SRCREV_kernel = "67814dfc55a57bfadac70cb751122bc81646ebf4"
+SRCREV_yocto-meta = "5a1b16216628f2edb6eacc7d25b9f0dc3e50fbac"
 
 SRC_URI = " \
-	git://gitlab.collabora.com/hardware-enablement/rockchip-3588/linux.git;protocol=https;branch=${BRANCH} \
+	git://gitlab.collabora.com/hardware-enablement/rockchip-3588/linux.git;name=kernel;protocol=https;branch=${BRANCH} \
 	git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=yocto-meta;branch=master;destsuffix=kernel-meta;protocol=https \
 "
 

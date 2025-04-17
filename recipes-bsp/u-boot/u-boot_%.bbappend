@@ -2,12 +2,13 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI:append = "\
 	file://env.cfg \
-	file://bootcmd.cfg \
 	file://decompression.cfg \
 	file://quickstart.cfg \
 	file://rock-5b-plus-nvme.patch \
 "
 
+SRC_URI:append = "${@bb.utils.contains('MACHINE_FEATURES', 'nvme_boot', 'file://bootcmd_nvme.cfg', 'file://bootcmd_emmc.cfg', d)}"
+
 BRANCH = "rk3588"
 SRC_URI = "git://gitlab.collabora.com/hardware-enablement/rockchip-3588/u-boot.git;protocol=https;branch=${BRANCH}"
-SRCREV = "${AUTOREV}"
+SRCREV = "cbc9673f77851953e294845549d418ffe2190ef9"
