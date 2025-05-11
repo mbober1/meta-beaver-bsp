@@ -1,0 +1,76 @@
+From 05cdd9c428c8ac8c4ac4df77e1e80e8bff307d2d Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Sat, 10 May 2025 21:40:02 +0000
+Subject: [PATCH] arm64: dts: Radxa Zero 3e: Add ilitek display
+Upstream-Status: Inappropriate
+
+---
+ .../dts/rockchip/rk3566-radxa-zero-3e.dts     | 55 +++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts b/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts
+index 4a830eb09f0b..6153791554de 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts
+@@ -50,3 +50,58 @@ gmac1_rstn: gmac1-rstn {
+ 		};
+ 	};
+ };
++
++&spi3{
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default", "high_speed";
++	pinctrl-0 = <&spi3m1_cs0 &spi3m1_pins>;
++	pinctrl-1 = <&spi3m1_cs0 &spi3m1_pins_hs>;
++
++	display: display@0{
++		compatible = "waveshare,rpi-lcd-35", "ilitek,ili9486";
++		reg = <0>;
++		spi-max-frequency = <16000000>;
++		txbuflen = <32768>;
++		rotate = <90>;
++		bgr = <0>;
++		fps = <29>;
++		buswidth = <8>;
++		regwidth = <16>;
++		reset-gpios = <&gpio3 RK_PC1 GPIO_ACTIVE_LOW>;
++		dc-gpios = <&gpio3 RK_PB2 GPIO_ACTIVE_HIGH>;
++		debug = <0>;
++		init = <0x10000f1 0x36 0x4 0x0 0x3c 0xf 0x8f
++						0x10000f2 0x18 0xa3 0x12 0x2 0xb2 0x12 0xff 0x10 0x0
++						0x10000f8 0x21 0x4
++						0x10000f9 0x0 0x8
++						0x1000036 0x8
++						0x10000b4 0x0
++						0x10000c1 0x41
++						0x10000c5 0x0 0x91 0x80 0x0
++						0x10000e0 0xf 0x1f 0x1c 0xc 0xf 0x8 0x48 0x98 0x37 0xa 0x13 0x4 0x11 0xd 0x0
++						0x10000e1 0xf 0x32 0x2e 0xb 0xd 0x5 0x47 0x75 0x37 0x6 0x10 0x3 0x24 0x20 0x0
++						0x100003a 0x55
++						0x1000011
++						0x1000036 0x28
++						0x20000ff
++						0x1000029>;
++	};
++
++	ads7846: ads7846@1 {
++		compatible = "ti,ads7846";
++		status = "okay";
++		reg = <1>; 
++		id = <1>;
++		spi-max-frequency = <2000000>;
++		ti,x-plate-ohms = /bits/ 16 <60>;
++		ti,pressure-max = /bits/ 16 <255>;
++		ti,swap-xy = <0>;
++		ti,invert-y = <1>;
++		vcc-supply = <&vcc_sys>;
++		interrupts = <RK_PA1 IRQ_TYPE_EDGE_FALLING>;
++		interrupt-parent = <&gpio3>;
++		pendown-gpio = <&gpio3 RK_PA1 GPIO_ACTIVE_HIGH>;
++	};
++};
+-- 
+2.34.1
+
