@@ -8,7 +8,7 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 KERNEL_VERSION_SANITY_SKIP="1"
 LINUX_VERSION = "6.14+"
 BRANCH = "linux-6.14.y"
-SRCREV_kernel = "9bc5c94e278f780af15b3f6e13ae08310aeae880"
+SRCREV_kernel = "e2d3e1fdb530198317501eb7ded4f3a5fb6c881c"
 SRCREV_yocto-meta = "5a1b16216628f2edb6eacc7d25b9f0dc3e50fbac"
 
 SRC_URI = " \
