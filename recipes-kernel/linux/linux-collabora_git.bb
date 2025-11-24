@@ -7,8 +7,8 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
 KERNEL_VERSION_SANITY_SKIP="1"
 LINUX_VERSION = "6.13+"
-BRANCH = "rock5b-plus"
-SRCREV_kernel = "67814dfc55a57bfadac70cb751122bc81646ebf4"
+BRANCH = "rockchip-release"
+SRCREV_kernel = "0fa4464135a05564d3f690dc6714979f7ed2fac5"
 SRCREV_yocto-meta = "5a1b16216628f2edb6eacc7d25b9f0dc3e50fbac"
 
 SRC_URI = " \

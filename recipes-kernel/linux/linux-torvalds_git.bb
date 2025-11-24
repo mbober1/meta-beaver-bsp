@@ -6,9 +6,9 @@ LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
 KERNEL_VERSION_SANITY_SKIP="1"
-LINUX_VERSION = "6.14+"
-BRANCH = "linux-6.14.y"
-SRCREV_kernel = "e2d3e1fdb530198317501eb7ded4f3a5fb6c881c"
+LINUX_VERSION = "6.17+"
+BRANCH = "linux-6.17.y"
+SRCREV_kernel = "1bfd0faa78d09eb41b81b002e0292db0f3e75de0"
 SRCREV_yocto-meta = "5a1b16216628f2edb6eacc7d25b9f0dc3e50fbac"
 
 SRC_URI = " \
