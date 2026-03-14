@@ -1,0 +1,38 @@
+From 71841c0d66d2d725826a67395b35ff87d0d9985e Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Sat, 13 Dec 2025 16:55:13 +0000
+Subject: [PATCH] add spi0m2_cs0 spidev
+Upstream-Status: Inappropriate
+
+---
+ .../boot/dts/rockchip/rk3588-rock-5b-plus.dts    | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus.dts b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus.dts
+index 5e984a44120e..b483dc9d6c20 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3588-rock-5b-plus.dts
+@@ -123,3 +123,19 @@ &vcc5v0_host {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&vcc5v0_host_en>;
+ };
++
++&spi0 {
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0m2_cs0 &spi0m2_pins>;
++	max-freq = <10000000>;
++
++	spidev@0 {
++		compatible = "spidev";
++		status = "okay";
++		reg = <0>;
++		spi-max-frequency = <10000000>;
++	};
++};
+\ No newline at end of file
+-- 
+2.34.1
+

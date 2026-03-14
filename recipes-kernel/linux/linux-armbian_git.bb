@@ -20,7 +20,7 @@ DEPENDS += "lzop-native"
 FIT_KERNEL_COMP_ALG ?= "lzo"
 FIT_KERNEL_COMP_ALG_EXTENSION ?= ".lzo"
 
-COMPATIBLE_MACHINE:luckfox-lyra = "luckfox-lyra"
+COMPATIBLE_MACHINE:luckfox-lyra-plus = "luckfox-lyra-plus"
 
 inherit kernel
 inherit kernel-yocto

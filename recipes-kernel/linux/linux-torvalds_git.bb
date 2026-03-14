@@ -28,5 +28,3 @@ COMPATIBLE_MACHINE:rock-5b-plus = "rock-5b-plus"
 inherit kernel
 inherit kernel-yocto
 require recipes-kernel/linux/linux-yocto.inc
-
-SRC_URI += "file://add-spi0m2_cs0-spidev.patch"

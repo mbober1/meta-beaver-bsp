@@ -15,6 +15,8 @@ SRC_URI = "git://gitlab.collabora.com/hardware-enablement/rockchip-3588/u-boot.g
 SRCREV = "a81c91446a19bb106467703f6336fbe366271e26"
 DEPENDS += "gnutls-native"
 
-BRANCH:luckfox-lyra = "rk3506"
-SRC_URI:luckfox-lyra = "git://source.denx.de/u-boot/contributors/kwiboo/u-boot.git;protocol=https;branch=${BRANCH}"
-SRCREV:luckfox-lyra = "c6782a37feee4a8aee08d321c01b4ca0b0562f0b"
+BRANCH:luckfox-lyra-plus = "rk3506"
+SRC_URI:luckfox-lyra-plus = "git://source.denx.de/u-boot/contributors/kwiboo/u-boot.git;protocol=https;branch=${BRANCH}"
+SRCREV:luckfox-lyra-plus = "c6782a37feee4a8aee08d321c01b4ca0b0562f0b"
+ROCKCHIP_TEE:closed-tpl:rk3506 = "${DEPLOY_DIR_IMAGE}/tee-rk3506.bin"
+EXTRA_OEMAKE:append:closed-tpl:rk3506 = " TEE=${ROCKCHIP_TEE}"
