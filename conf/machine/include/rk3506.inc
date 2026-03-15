@@ -12,9 +12,6 @@ require conf/machine/include/rockchip-wic.inc
 PREFERRED_PROVIDER_optee-os = "rockchip-rkbin-optee-os"
 
 KBUILD_DEFCONFIG ?= "rk3506_defconfig"
-KERNEL_CLASSES = "kernel-fitimage"
-KERNEL_IMAGETYPE ?= "fitImage"
 
 UBOOT_SUFFIX ?= "itb"
 UBOOT_ENTRYPOINT ?= "0x02800000"
-UBOOT_EXTLINUX_FDT = "${@bb.utils.contains('KERNEL_IMAGETYPE', 'fitImage', '', '/boot', d)}"

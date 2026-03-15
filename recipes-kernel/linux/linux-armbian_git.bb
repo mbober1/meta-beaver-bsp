@@ -1,29 +1,14 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
-
-DESCRIPTION = "Linux Kernel"
-SECTION = "kernel"
-LICENSE = "GPL-2.0-only"
-LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
+require linux-custom.inc
 
 LINUX_VERSION = "6.1.115"
-KBRANCH = "rk-6.1-rkr5.1"
+KERNEL_BRANCH = "rk-6.1-rkr5.1"
 SRCREV_kernel = "e40822f070f56bd3e5b3a94285c61c26abd394cb"
+
+META_BRANCH = "yocto-6.1"
 SRCREV_yocto-meta = "7545dc5bc77560f4b1b6efc47b56e953dc86572d"
-PV = "${LINUX_VERSION}"
 
-SRC_URI = " \
-	git://github.com/armbian/linux-rockchip.git;name=kernel;protocol=https;branch=${KBRANCH} \
-	git://git.yoctoproject.org/yocto-kernel-cache;type=kmeta;name=yocto-meta;branch=yocto-6.1;destsuffix=kernel-meta;protocol=https \
+SRC_URI:append = " \
+	git://github.com/armbian/linux-rockchip.git;name=kernel;protocol=https;branch=${KERNEL_BRANCH} \
 "
-
-DEPENDS += "lzop-native"
-FIT_KERNEL_COMP_ALG ?= "lzo"
-FIT_KERNEL_COMP_ALG_EXTENSION ?= ".lzo"
-
-COMPATIBLE_MACHINE:luckfox-lyra-plus = "luckfox-lyra-plus"
-
-inherit kernel
-inherit kernel-yocto
-require recipes-kernel/linux/linux-yocto.inc
 
 INSANE_SKIP:${PN}-src += "buildpaths"

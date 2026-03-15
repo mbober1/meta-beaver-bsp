@@ -1,10 +1,13 @@
-DDRBIN_VERS:rk3506 ?= "v1.02"
-DDRBIN_FILE:rk3506 ?= "rk3506_ddr_750MHz_${DDRBIN_VERS}.bin"
+SRCREV = "69bc9afdef1a15e06c1bd4238fc109bca3b3479a"
 
-do_deploy:rk3506() {
-	# Prebuilt U-Boot TPL (DDR init)
-	install -m 644 ${S}/bin/rk35/${DDRBIN_FILE} ${DEPLOYDIR}/ddr-rk3506.bin
-	install -m 644 ${S}/bin/rk35/rk3506_tee_v1.23.bin ${DEPLOYDIR}/tee-rk3506.bin
-}
+RKBIN_BINVERS:rk3506 ?= "v1.06"
+RKBIN_BINFILE:rk3506 ?= "rk3506_ddr_750MHz_${RKBIN_BINVERS}.bin"
+RKBIN_DEPLOY_FILENAME:rk3506 ?= "ddr-rk3506.bin"
 
 COMPATIBLE_MACHINE:rk3506 = "rk3506"
+RKBIN_BINDIR:rk3506 ?= "bin/rk35/"
+
+do_deploy:rk3506() {
+	install -D -m 644 ${S}/${RKBIN_BINDIR}${RKBIN_BINFILE} ${DEPLOYDIR}/${RKBIN_DEPLOY_FILENAME}
+	install -m 644 ${S}/${RKBIN_BINDIR}rk3506_tee_v2.10.bin ${DEPLOYDIR}/tee-rk3506.bin
+}
