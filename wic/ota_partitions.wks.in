@@ -14,7 +14,7 @@
 
 part loader1   --offset 64s    --fixed-size 3552K --fstype=none --part-name loader1   --source rawcopy --sourceparams="file=${SPL_BINARY}"
 part loader2   --offset 16384s --fixed-size 4096K --fstype=none --part-name loader2   --source rawcopy --sourceparams="file=u-boot.${UBOOT_SUFFIX}"
-part /         --label rootfsA --active           --fstype=ext4 --part-name rootfsA   --source rootfs  --part-type ${ROOT_DPS} --size=1536
-part /         --label rootfsB                    --fstype=ext4 --part-name rootfsB   --source rootfs  --part-type ${ROOT_DPS} --size=1536
+part /         --label rootfsA --active           --fstype=ext4 --part-name rootfsA   --source rootfs  --part-type ${ROOT_DPS} --size=3072
+part /         --label rootfsB                    --fstype=ext4 --part-name rootfsB   --source rootfs  --part-type ${ROOT_DPS} --size=3072
 
 bootloader --ptable gpt

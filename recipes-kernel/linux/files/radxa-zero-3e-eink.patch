@@ -1,0 +1,95 @@
+From 39513de4bdd502f7c9ff57601592981300dab6ee Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Wed, 1 Apr 2026 12:52:29 +0000
+Subject: [PATCH] radxa-zero-3e-add-buttons-2
+Upstream-Status: Inappropriate
+
+---
+ .../dts/rockchip/rk3566-radxa-zero-3e.dts     | 58 +++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts b/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts
+index 4a830eb09f0b..ef82225d8384 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3566-radxa-zero-3e.dts
+@@ -3,6 +3,7 @@
+ /dts-v1/;
+ 
+ #include "rk3566-radxa-zero-3.dtsi"
++#include <dt-bindings/input/linux-event-codes.h>
+ 
+ / {
+ 	model = "Radxa ZERO 3E";
+@@ -12,6 +13,36 @@ aliases {
+ 		ethernet0 = &gmac1;
+ 		mmc0 = &sdmmc0;
+ 	};
++
++	gpio_keys: gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-0 = <&btn_pins_ctrl>;
++		pinctrl-names = "default";
++
++		key-1 {
++			gpios = <&gpio3 RK_PB3 GPIO_ACTIVE_LOW>;
++			label = "KEY_1";
++			linux,code = <KEY_1>;
++		};
++
++		key-2 {
++			gpios = <&gpio3 RK_PB4 GPIO_ACTIVE_LOW>;
++			label = "KEY_2";
++			linux,code = <KEY_2>;
++		};
++
++		key-3 {
++			gpios = <&gpio3 RK_PC3 GPIO_ACTIVE_LOW>;
++			label = "KEY_3";
++			linux,code = <KEY_3>;
++		};
++
++		key-4 {
++			gpios = <&gpio3 RK_PA4 GPIO_ACTIVE_LOW>;
++			label = "KEY_4";
++			linux,code = <KEY_4>;
++		};
++	};
+ };
+ 
+ &gmac1 {
+@@ -49,4 +80,31 @@ gmac1_rstn: gmac1-rstn {
+ 			rockchip,pins = <3 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
+ 		};
+ 	};
++
++	gpio-btns {
++		btn_pins_ctrl: btn-pins-ctrl {
++			rockchip,pins =
++				<3 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PB3 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up>,
++				<3 RK_PC3 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
+ };
++
++&spi3 {
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default", "high_speed";
++	pinctrl-0 = <&spi3m1_cs0 &spi3m1_pins>;
++	pinctrl-1 = <&spi3m1_cs0 &spi3m1_pins_hs>;
++	max-freq = <50000000>;
++
++	spidev@0 {
++		compatible = "arduino,unoq-mcu";
++		status = "okay";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++	};
++};
+\ No newline at end of file
+-- 
+2.34.1
+

@@ -1,8 +1,8 @@
 require linux-custom.inc
 
-LINUX_VERSION = "6.19.8"
-KERNEL_BRANCH = "linux-6.19.y"
-SRCREV_kernel = "86818b2e7d9c22225b15f2ae91d3f35c4a07dfd9"
+LINUX_VERSION = "7.0-rc7"
+KERNEL_BRANCH = "master"
+SRCREV_kernel = "0e5d0a0b5ca6ea4e391d6786266405c5871e0151"
 
 META_BRANCH = "yocto-6.18"
 SRCREV_yocto-meta = "bc293057a14f94dd50838a399bd8758a6766b877"
