@@ -9,6 +9,9 @@ SRCREV_yocto-meta = "7545dc5bc77560f4b1b6efc47b56e953dc86572d"
 
 SRC_URI:append = " \
 	git://github.com/armbian/linux-rockchip.git;name=kernel;protocol=https;branch=${KERNEL_BRANCH} \
+	file://lyra-add-display.patch \
+	file://lyra-fix-cma.patch \
+	file://lyra-drm.cfg \
 "
 
 INSANE_SKIP:${PN}-src += "buildpaths"

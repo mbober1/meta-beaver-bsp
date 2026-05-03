@@ -1,0 +1,10 @@
+# short-description: Create SD card image for stm32mp1
+# long-description: Creates a partitioned SD card image for stm32mp1.
+
+part fsbl1  --source rawcopy --sourceparams="file=u-boot-spl.stm32" --ondisk mmcblk --align 1 --size 256k --part-name fsbl1
+part fsbl2  --source rawcopy --sourceparams="file=u-boot-spl.stm32" --ondisk mmcblk --align 1 --size 256k --part-name fsbl2
+part ssbl   --source rawcopy --sourceparams="file=u-boot.img"       --ondisk mmcblk --align 1 --size 2M   --part-name ssbl
+
+part /      --source rootfs --label rootfsA --fstype=ext4 --part-name rootfsA --ondisk mmcblk --active
+
+bootloader --ptable gpt
