@@ -21,12 +21,3 @@ BRANCH:stmp157-olinuxino-lime2 = "release-20250305"
 SRC_URI:stmp157-olinuxino-lime2 = "git://github.com/OLIMEX/u-boot-olinuxino.git;protocol=https;branch=${BRANCH}"
 SRCREV:stmp157-olinuxino-lime2 = "23d8f769a94ae230b7a68fa812cc3c4dc0cbf1c9"
 
-
-SRC_URI:stm32mp15-disco:append = " \
-  file://stm32mp157c-dk2.cfg \
-  file://st.bmp \
-"
-
-do_compile:stm32mp15-disco:prepend() {
-  cp ${WORKDIR}/sources-unpack/st.bmp ${S}/tools/logos/st.bmp
-}
