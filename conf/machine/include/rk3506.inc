@@ -10,7 +10,7 @@ require conf/machine/include/rockchip-defaults.inc
 require conf/machine/include/arm/armv7a/tune-cortexa7.inc
 require conf/machine/include/rockchip-wic.inc
 
-KBUILD_DEFCONFIG ?= "rk3506_defconfig"
+KBUILD_DEFCONFIG ?= "multi_v7_defconfig"
 
 UBOOT_SUFFIX ?= "itb"
 UBOOT_ENTRYPOINT ?= "0x02800000"
