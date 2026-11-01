@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Luckfox Lyra Plus display overlay
+ *
+ * Waveshare 10.1" 800x1280 JD9365 MIPI-DSI panel, its I2C backlight/PWM
+ * controller and the Goodix GT9271 touch controller mounted on the same
+ * carrier board.
+ *
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+
+&pinctrl {
+	rm_io_display {
+		/omit-if-no-ref/
+		rm_io0_pins: rm-io0-pins {
+			rockchip,pins =
+				<0 RK_PA0 31 &pcfg_pull_none>;
+		};
+
+		/omit-if-no-ref/
+		rm_io1_pins: rm-io1-pins {
+			rockchip,pins =
+				<0 RK_PA1 30 &pcfg_pull_none>;
+		};
+	};
+};
+
+&display_subsystem {
+	status = "okay";
+};
+
+&vop {
+	status = "okay";
+};
+
+&dsi {
+	status = "okay";
+
+	panel@0 {
+		compatible = "waveshare,10.1-dsi-touch-a";
+		reg = <0>;
+		reset-gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_LOW>;
+		backlight = <&ws_bl>;
+
+		port {
+			panel_in_dsi: endpoint {
+				remote-endpoint = <&dsi_out_panel>;
+			};
+		};
+	};
+};
+
+&dsi_dphy {
+	status = "okay";
+};
+
+&dsi_out {
+	dsi_out_panel: endpoint {
+		remote-endpoint = <&panel_in_dsi>;
+		data-lanes = <1 2>;
+	};
+};
+
+&i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&rm_io0_pins &rm_io1_pins>;
+	status = "okay";
+
+	ws_bl: backlight@45 {
+		compatible = "waveshare,dsi-backlight";
+		reg = <0x45>;
+		default-brightness-level = <200>;
+	};
+
+	touchscreen@5d {
+		compatible = "goodix,gt9271";
+		reg = <0x5d>;
+		touchscreen-size-x = <800>;
+		touchscreen-size-y = <1280>;
+		touchscreen-inverted-y;
+	};
+};

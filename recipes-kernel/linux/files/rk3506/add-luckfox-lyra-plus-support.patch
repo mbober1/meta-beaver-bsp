@@ -65,7 +65,7 @@ new file mode 100644
 index 000000000000..865812b9e1ed
 --- /dev/null
 +++ b/arch/arm/boot/dts/rockchip/rk3506-luckfox-lyra.dtsi
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,120 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
@@ -146,14 +146,6 @@ index 000000000000..865812b9e1ed
 +	cpu-supply = <&vdd_cpu>;
 +};
 +
-+&display_subsystem {
-+	status = "okay";
-+};
-+
-+&vop {
-+	status = "okay";
-+};
-+
 +&mmc {
 +	max-frequency = <52000000>;
 +	bus-width = <4>;
@@ -167,11 +159,6 @@ index 000000000000..865812b9e1ed
 +	pinctrl-0 = <&sdmmc_clk_pins &sdmmc_cmd_pins &sdmmc_bus4_pins &sdmmc_det &sdmmc_pwren>;
 +	vqmmc-supply = <&vcc_3v3>;
 +	vmmc-supply = <&vcc_3v3>;
-+	status = "okay";
-+};
-+
-+&saradc {
-+	vref-supply = <&vcc_1v8>;
 +	status = "okay";
 +};
 +
@@ -893,14 +880,14 @@ index 000000000000..9d82df451445
 +		/omit-if-no-ref/
 +		rm_io0_pins: rm-io0-pins {
 +			rockchip,pins =
-+				/* rm_io0 */
-+				<0 RK_PA0 7 &pcfg_pull_none>;
++				/* rm_io0: mux 15 + 16 (I2C0_SDA) routes GRF_PMU RM_IO0 */
++				<0 RK_PA0 31 &pcfg_pull_none>;
 +		};
 +		/omit-if-no-ref/
 +		rm_io1_pins: rm-io1-pins {
 +			rockchip,pins =
-+				/* rm_io1 */
-+				<0 RK_PA1 7 &pcfg_pull_none>;
++				/* rm_io1: mux 15 + 15 (I2C0_SCL) routes GRF_PMU RM_IO1 */
++				<0 RK_PA1 30 &pcfg_pull_none>;
 +		};
 +		/omit-if-no-ref/
 +		rm_io2_pins: rm-io2-pins {
@@ -2185,7 +2172,7 @@ new file mode 100644
 index 000000000000..4fd6914732d0
 --- /dev/null
 +++ b/arch/arm/boot/dts/rockchip/rk3506.dtsi
-@@ -0,0 +1,690 @@
+@@ -0,0 +1,692 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Copyright (c) 2023 Rockchip Electronics Co., Ltd.
@@ -2666,6 +2653,8 @@ index 000000000000..4fd6914732d0
 +			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&cru ACLK_VOP>, <&cru DCLK_VOP>, <&cru HCLK_VOP>;
 +			clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++			resets = <&cru SRST_H_VOP>, <&cru SRST_VOP>;
++			reset-names = "ahb", "dclk";
 +			status = "disabled";
 +
 +			vop_out: port {
@@ -2881,7 +2870,7 @@ new file mode 100644
 index 000000000000..12925c3661d9
 --- /dev/null
 +++ b/arch/arm/boot/dts/rockchip/rk3506g-luckfox-lyra-plus-sd.dts
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,53 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
@@ -2901,14 +2890,6 @@ index 000000000000..12925c3661d9
 +};
 +
 +&uart0 {
-+	status = "okay";
-+};
-+
-+&dsi {
-+	status = "okay";
-+};
-+
-+&dsi_dphy {
 +	status = "okay";
 +};
 +

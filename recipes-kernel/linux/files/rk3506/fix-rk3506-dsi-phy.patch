@@ -1,0 +1,136 @@
+Upstream-Status: Inappropriate
+diff --git a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
+--- a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
+@@ -511,8 +511,9 @@
+ 	 */
+ 	ta_wait = DIV_ROUND_UP(cfg->ta_get, t_txclkesc);
+ 
++	/* timings[].rate is in Mbps, pll.rate is in Hz (cf. vendor driver). */
+ 	for (i = 0; i < inno->pdata->num_timings; i++)
+-		if (inno->pll.rate <= timings[i].rate)
++		if (inno->pll.rate <= timings[i].rate * USEC_PER_SEC)
+ 			break;
+ 
+ 	if (i == inno->pdata->num_timings)
+@@ -664,6 +665,13 @@
+ 	phy_update_bits(inno, REGISTER_PART_ANALOG, 0x00,
+ 			POWER_WORK_MASK, POWER_WORK_ENABLE);
+ 
++	/* RK3506: the internal 1.2V LDO feeds the D-PHY and is off by default. */
++	if (of_device_is_compatible(inno->dev->of_node,
++				    "rockchip,rk3506-dsi-dphy")) {
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x17, BIT(7), 0);
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x1d, BIT(7), 0);
++	}
++
+ 	switch (inno->mode) {
+ 	case PHY_MODE_MIPI_DPHY:
+ 		inno_dsidphy_mipi_mode_enable(inno);
+@@ -699,6 +707,14 @@
+ 			LVDS_PLL_POWER_MASK | LVDS_BANDGAP_POWER_MASK,
+ 			LVDS_PLL_POWER_OFF | LVDS_BANDGAP_POWER_DOWN);
+ 
++	if (of_device_is_compatible(inno->dev->of_node,
++				    "rockchip,rk3506-dsi-dphy")) {
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x17, BIT(7),
++				BIT(7));
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x1d, BIT(7),
++				BIT(7));
++	}
++
+ 	pm_runtime_put(inno->dev);
+ 	clk_disable_unprepare(inno->ref_clk);
+ 	clk_disable_unprepare(inno->pclk_phy);
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+@@ -201,6 +201,8 @@
+ #define RK3506_DSI_FORCETXSTOPMODE	(0xf << 4)
+ #define RK3506_DSI_TURNDISABLE		BIT(2)
+ #define RK3506_DSI_FORCERXMODE		BIT(0)
++#define RK3506_DSI_PHY_ENABLE_LANE0	BIT(8)
++#define RK3506_DSI_PHY_ENABLE_LANE1	BIT(9)
+ 
+ /*
+  * Note these registers do not appear in the datasheet, they are
+@@ -304,6 +306,9 @@
+ 	struct dw_mipi_dsi_plat_data pdata;
+ 
+ 	bool dsi_bound;
++
++	/* external D-PHY is powered up early, in dw_mipi_dsi_phy_init() */
++	bool phy_powered_on;
+ };
+ 
+ static struct dw_mipi_dsi_rockchip *to_dsi(struct drm_encoder *encoder)
+@@ -417,13 +422,21 @@
+ 	return DIV_ROUND_UP(ns * dsi->lane_mbps, 1000);
+ }
+ 
++static void dw_mipi_dsi_phy_power_on(void *priv_data);
++
+ static int dw_mipi_dsi_phy_init(void *priv_data)
+ {
+ 	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+ 	int ret, i, vco;
+ 
+-	if (dsi->phy)
++	if (dsi->phy) {
++		/*
++		 * Power the external D-PHY before the host releases PHY reset
++		 * and polls for lock, otherwise the first modeset times out.
++		 */
++		dw_mipi_dsi_phy_power_on(priv_data);
+ 		return 0;
++	}
+ 
+ 	/*
+ 	 * Get vco from frequency(lane_mbps)
+@@ -538,21 +551,34 @@
+ 	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+ 	int ret;
+ 
++	if (dsi->phy_powered_on)
++		return;
++
+ 	ret = phy_set_mode(dsi->phy, PHY_MODE_MIPI_DPHY);
+ 	if (ret) {
+ 		DRM_DEV_ERROR(dsi->dev, "failed to set phy mode: %d\n", ret);
+ 		return;
+ 	}
+ 
+-	phy_configure(dsi->phy, &dsi->phy_opts);
++	ret = phy_configure(dsi->phy, &dsi->phy_opts);
++	if (ret) {
++		DRM_DEV_ERROR(dsi->dev, "failed to configure phy: %d\n", ret);
++		return;
++	}
++
+ 	phy_power_on(dsi->phy);
++	dsi->phy_powered_on = true;
+ }
+ 
+ static void dw_mipi_dsi_phy_power_off(void *priv_data)
+ {
+ 	struct dw_mipi_dsi_rockchip *dsi = priv_data;
+ 
++	if (!dsi->phy_powered_on)
++		return;
++
+ 	phy_power_off(dsi->phy);
++	dsi->phy_powered_on = false;
+ }
+ 
+ static int
+@@ -1677,7 +1703,9 @@
+ 		.lanecfg1_grf_reg = RK3506_SYS_GRF_SOC_CON6,
+ 		.lanecfg1 = (FIELD_PREP_WM16_CONST(RK3506_DSI_TURNDISABLE, 0) |
+ 			     FIELD_PREP_WM16_CONST(RK3506_DSI_FORCERXMODE, 0) |
+-			     FIELD_PREP_WM16_CONST(RK3506_DSI_FORCETXSTOPMODE, 0)),
++			     FIELD_PREP_WM16_CONST(RK3506_DSI_FORCETXSTOPMODE, 0) |
++			     FIELD_PREP_WM16_CONST(RK3506_DSI_PHY_ENABLE_LANE0, 1) |
++			     FIELD_PREP_WM16_CONST(RK3506_DSI_PHY_ENABLE_LANE1, 1)),
+ 		.max_data_lanes = 2,
+ 	},
+ 	{ /* sentinel */ }

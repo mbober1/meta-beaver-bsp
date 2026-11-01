@@ -1,0 +1,14 @@
+Upstream-Status: Inappropriate
+diff --git a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
+index 5202c1ffc6e1..28775f34360c 100644
+--- a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
++++ b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
+@@ -3220,7 +3220,7 @@ static int jadard_dsi_probe(struct mipi_dsi_device *dsi)
+ 	}
+ 	dev_dbg(&dsi->dev, "lanes: %d\n", dsi->lanes);
+ 
+-	jadard->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	jadard->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+ 	if (IS_ERR(jadard->reset))
+ 		return dev_err_probe(&dsi->dev, PTR_ERR(jadard->reset),
+ 				"failed to get our reset GPIO\n");

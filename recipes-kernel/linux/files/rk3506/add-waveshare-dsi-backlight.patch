@@ -1,0 +1,211 @@
+Upstream-Status: Inappropriate
+
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -529,6 +529,14 @@
+ 	  If you have a LCD backlight adjustable by LED class driver, say Y
+ 	  to enable this driver.
+ 
++config BACKLIGHT_WAVESHARE_DSI
++	tristate "Waveshare DSI panel I2C backlight"
++	depends on I2C
++	help
++	  Say Y to enable the backlight controller found on Waveshare DSI
++	  panel carrier boards.  The controller is accessed over I2C and
++	  exposes a single PWM brightness register.
++
+ endif # BACKLIGHT_CLASS_DEVICE
+ 
+ endmenu
+diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
+--- a/drivers/video/backlight/Makefile
++++ b/drivers/video/backlight/Makefile
+@@ -64,3 +64,4 @@
+ obj-$(CONFIG_BACKLIGHT_ARCXCNN) 	+= arcxcnn_bl.o
+ obj-$(CONFIG_BACKLIGHT_RAVE_SP)		+= rave-sp-backlight.o
+ obj-$(CONFIG_BACKLIGHT_LED)		+= led_bl.o
++obj-$(CONFIG_BACKLIGHT_WAVESHARE_DSI)	+= waveshare-dsi-backlight.o
+diff --git a/drivers/video/backlight/waveshare-dsi-backlight.c b/drivers/video/backlight/waveshare-dsi-backlight.c
+new file mode 100644
+index 000000000000..111111111111
+--- /dev/null
++++ b/drivers/video/backlight/waveshare-dsi-backlight.c
+@@ -0,0 +1,177 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Backlight driver for the Waveshare DSI panel I2C controller.
++ *
++ * The panel carrier board exposes a small I2C microcontroller (usually at
++ * address 0x45) that controls panel power and the backlight PWM.  This is a
++ * trimmed-down port of the Waveshare "touchscreen panel regulator" driver:
++ * only the backlight/PWM part is needed here, because the panel itself is
++ * driven by the regular DSI panel driver and the touch controller is a
++ * separate Goodix GT9271 on the same bus.
++ */
++
++#include <linux/backlight.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/fb.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/property.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++
++/* I2C registers of the microcontroller. */
++#define REG_TP		0x94
++#define REG_LCD		0x95
++#define REG_PWM		0x96
++#define REG_SIZE	0x97
++#define REG_ID		0x98
++#define REG_VERSION	0x99
++
++/*
++ * Bits of the 16-bit panel power state written to REG_TP (high byte) and
++ * REG_LCD (low byte).
++ */
++#define WS_PWR_VCC		BIT(8)
++#define WS_PWR_VCC_1		BIT(9)
++/* Backlight enable; verified on the 10.1" panel carrier board. */
++#define WS_PWR_BL_ENABLE	BIT(2)
++
++#define WS_BL_MIN_BRIGHTNESS	5
++#define WS_BL_MAX_BRIGHTNESS	255
++#define WS_BL_DEFAULT_BRIGHTNESS	200
++
++struct waveshare_dsi_backlight {
++	struct device *dev;
++	struct regmap *regmap;
++	struct mutex lock;	/* protects poweron_state */
++	u16 poweron_state;
++};
++
++static const struct regmap_config waveshare_dsi_backlight_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++	.max_register = REG_VERSION,
++};
++
++static int waveshare_dsi_backlight_update_status(struct backlight_device *bl)
++{
++	struct waveshare_dsi_backlight *priv = bl_get_data(bl);
++	int brightness = bl->props.brightness;
++
++	if (bl->props.power != FB_BLANK_UNBLANK ||
++	    bl->props.state & (BL_CORE_SUSPENDED | BL_CORE_FBBLANK))
++		brightness = 0;
++
++	if (brightness > 0 && brightness < WS_BL_MIN_BRIGHTNESS)
++		brightness = WS_BL_MIN_BRIGHTNESS;
++	if (brightness > WS_BL_MAX_BRIGHTNESS)
++		brightness = WS_BL_MAX_BRIGHTNESS;
++
++	return regmap_write(priv->regmap, REG_PWM, brightness);
++}
++
++static const struct backlight_ops waveshare_dsi_backlight_ops = {
++	.update_status = waveshare_dsi_backlight_update_status,
++};
++
++static int waveshare_dsi_backlight_probe(struct i2c_client *client)
++{
++	struct backlight_properties props;
++	struct backlight_device *bl;
++	struct waveshare_dsi_backlight *priv;
++	unsigned int default_brightness = WS_BL_DEFAULT_BRIGHTNESS;
++	unsigned int val;
++	int ret;
++
++	priv = devm_kzalloc(&client->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = &client->dev;
++	mutex_init(&priv->lock);
++
++	priv->regmap = devm_regmap_init_i2c(client,
++					    &waveshare_dsi_backlight_regmap_config);
++	if (IS_ERR(priv->regmap))
++		return dev_err_probe(&client->dev, PTR_ERR(priv->regmap),
++				     "failed to allocate register map\n");
++
++	/* Enable panel VCC and the backlight output stage. */
++	priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1 | WS_PWR_BL_ENABLE;
++	regmap_write(priv->regmap, REG_TP, priv->poweron_state >> 8);
++	regmap_write(priv->regmap, REG_LCD, priv->poweron_state & 0xff);
++	usleep_range(20000, 25000);
++
++	if (!regmap_read(priv->regmap, REG_ID, &val))
++		dev_info(&client->dev, "waveshare panel hw id = 0x%x\n", val);
++	if (!regmap_read(priv->regmap, REG_SIZE, &val))
++		dev_info(&client->dev, "waveshare panel size = %d\n", val);
++	if (!regmap_read(priv->regmap, REG_VERSION, &val))
++		dev_info(&client->dev, "waveshare panel mcu version = 0x%x\n", val);
++
++	device_property_read_u32(&client->dev, "default-brightness-level",
++				 &default_brightness);
++	if (default_brightness > WS_BL_MAX_BRIGHTNESS)
++		default_brightness = WS_BL_MAX_BRIGHTNESS;
++
++	memset(&props, 0, sizeof(props));
++	props.type = BACKLIGHT_RAW;
++	props.max_brightness = WS_BL_MAX_BRIGHTNESS;
++
++	bl = devm_backlight_device_register(&client->dev, "ws_bl", &client->dev,
++					    priv, &waveshare_dsi_backlight_ops,
++					    &props);
++	if (IS_ERR(bl))
++		return dev_err_probe(&client->dev, PTR_ERR(bl),
++				     "failed to register backlight\n");
++
++	bl->props.brightness = default_brightness;
++	bl->props.power = FB_BLANK_UNBLANK;
++
++	ret = backlight_update_status(bl);
++	if (ret)
++		return ret;
++
++	i2c_set_clientdata(client, priv);
++
++	return 0;
++}
++
++static void waveshare_dsi_backlight_remove(struct i2c_client *client)
++{
++	struct waveshare_dsi_backlight *priv = i2c_get_clientdata(client);
++
++	regmap_write(priv->regmap, REG_PWM, 0);
++	mutex_destroy(&priv->lock);
++}
++
++static void waveshare_dsi_backlight_shutdown(struct i2c_client *client)
++{
++	struct waveshare_dsi_backlight *priv = i2c_get_clientdata(client);
++
++	regmap_write(priv->regmap, REG_PWM, 0);
++}
++
++static const struct of_device_id waveshare_dsi_backlight_of_match[] = {
++	{ .compatible = "waveshare,dsi-backlight" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, waveshare_dsi_backlight_of_match);
++
++static struct i2c_driver waveshare_dsi_backlight_driver = {
++	.driver = {
++		.name = "waveshare-dsi-backlight",
++		.of_match_table = waveshare_dsi_backlight_of_match,
++	},
++	.probe = waveshare_dsi_backlight_probe,
++	.remove = waveshare_dsi_backlight_remove,
++	.shutdown = waveshare_dsi_backlight_shutdown,
++};
++module_i2c_driver(waveshare_dsi_backlight_driver);
++
++MODULE_AUTHOR("Waveshare Team <support@waveshare.com>");
++MODULE_DESCRIPTION("Backlight driver for Waveshare DSI panels");
++MODULE_LICENSE("GPL");

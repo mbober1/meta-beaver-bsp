@@ -1,0 +1,110 @@
+Upstream-Status: Inappropriate
+diff --git a/drivers/video/backlight/waveshare-dsi-backlight.c b/drivers/video/backlight/waveshare-dsi-backlight.c
+--- a/drivers/video/backlight/waveshare-dsi-backlight.c
++++ b/drivers/video/backlight/waveshare-dsi-backlight.c
+@@ -38,6 +38,14 @@
+ #define WS_PWR_VCC_1		BIT(9)
+ /* Backlight enable; verified on the 10.1" panel carrier board. */
+ #define WS_PWR_BL_ENABLE	BIT(2)
++/*
++ * The same 16-bit register also controls the panel rails and reset through
++ * the MCU GPIOs: AVDD, LCD reset and IOVCC.  They must be powered up before
++ * the DSI panel is initialized.
++ */
++#define WS_PWR_AVDD		BIT(0)
++#define WS_PWR_LCD_RESET	BIT(1)
++#define WS_PWR_IOVCC		BIT(4)
+ 
+ #define WS_BL_MIN_BRIGHTNESS	5
+ #define WS_BL_MAX_BRIGHTNESS	255
+@@ -77,6 +85,19 @@
+ 	.update_status = waveshare_dsi_backlight_update_status,
+ };
+ 
++static int
++waveshare_dsi_backlight_write_state(struct waveshare_dsi_backlight *priv)
++{
++	int ret;
++
++	ret = regmap_write(priv->regmap, REG_TP, priv->poweron_state >> 8);
++	if (ret)
++		return ret;
++
++	return regmap_write(priv->regmap, REG_LCD,
++			    priv->poweron_state & 0xff);
++}
++
+ static int waveshare_dsi_backlight_probe(struct i2c_client *client)
+ {
+ 	struct backlight_properties props;
+@@ -99,10 +120,34 @@
+ 		return dev_err_probe(&client->dev, PTR_ERR(priv->regmap),
+ 				     "failed to allocate register map\n");
+ 
+-	/* Enable panel VCC and the backlight output stage. */
+-	priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1 | WS_PWR_BL_ENABLE;
+-	regmap_write(priv->regmap, REG_TP, priv->poweron_state >> 8);
+-	regmap_write(priv->regmap, REG_LCD, priv->poweron_state & 0xff);
++	/*
++	 * Waveshare power-on order: VCC, then IOVCC and AVDD, then release the
++	 * panel reset and enable the backlight. Without AVDD and IOVCC the
++	 * JD9365 stays unpowered.
++	 */
++	priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1;
++	ret = waveshare_dsi_backlight_write_state(priv);
++	if (ret)
++		return ret;
++	msleep(20);
++
++	priv->poweron_state |= WS_PWR_IOVCC | WS_PWR_AVDD;
++	ret = waveshare_dsi_backlight_write_state(priv);
++	if (ret)
++		return ret;
++	msleep(20);
++
++	/* Release the LCD reset (low to high transition resets the panel). */
++	priv->poweron_state |= WS_PWR_LCD_RESET;
++	ret = waveshare_dsi_backlight_write_state(priv);
++	if (ret)
++		return ret;
++	msleep(60);
++
++	priv->poweron_state |= WS_PWR_BL_ENABLE;
++	ret = waveshare_dsi_backlight_write_state(priv);
++	if (ret)
++		return ret;
+ 	usleep_range(20000, 25000);
+ 
+ 	if (!regmap_read(priv->regmap, REG_ID, &val))
+diff --git a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
+--- a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
++++ b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
+@@ -2337,12 +2337,13 @@
+ 	.htotal		= 800 + 40 + 20 + 20,
+ 
+ 	.vdisplay	= 1280,
+-	.vsync_start	= 1280 + 20,
+-	.vsync_end	= 1280 + 20 + 20,
+-	.vtotal		= 1280 + 20 + 20 + 4,
++	.vsync_start	= 1280 + 30,
++	.vsync_end	= 1280 + 30 + 4,
++	.vtotal		= 1280 + 30 + 4 + 10,
+ 
+ 	.width_mm	= 135,
+ 	.height_mm	= 216,
++	.flags		= DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+ 	.type		= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
+ };
+ 
+@@ -2668,8 +2669,9 @@
+ 	.mode_2ln = &waveshare_10_1_a_mode,
+ 	.format = MIPI_DSI_FMT_RGB888,
+ 	.init = waveshare_10_1_a_init,
+-	.mode_flags = MIPI_DSI_MODE_VIDEO_HSE | MIPI_DSI_MODE_VIDEO |
+-		MIPI_DSI_MODE_LPM | MIPI_DSI_CLOCK_NON_CONTINUOUS,
++	/* RK3506: this host only drives the panel correctly in burst mode. */
++	.mode_flags = MIPI_DSI_MODE_VIDEO_BURST | MIPI_DSI_MODE_VIDEO |
++		MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_NO_EOT_PACKET,
+ };
+ 
+ static int waveshare_10_1_b_init(struct jadard *jadard)
