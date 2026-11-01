@@ -13,4 +13,5 @@ SRC_URI = " \
 
 inherit kernel
 inherit kernel-yocto
+inherit kernel-dt-overlay
 require recipes-kernel/linux/linux-yocto.inc

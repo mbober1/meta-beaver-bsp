@@ -13,9 +13,19 @@ SRC_URI:append = " \
 
 SRC_URI:append:luckfox-lyra-plus = " \
 	file://rk3506/add-luckfox-lyra-plus-support.patch \
+	file://rk3506/rk3506g-luckfox-lyra-plus-display.dtso \
+	file://rk3506/rk3506g-luckfox-lyra-plus-mcu-rproc.dtso \
 	file://rk3506/stmmac-rx-init-gfp.patch \
-	file://rk3506/lyra-remote.cfg \
+	file://rk3506/jadard-optional-reset.patch \
+	file://rk3506/rk3506-pinctrl-rmio.patch \
+	file://rk3506/add-waveshare-dsi-backlight.patch \
+	file://rk3506/fix-rk3506-dsi-phy.patch \
+	file://rk3506/fix-waveshare-10-1-panel.patch \
 	file://rk3506/rk3506.cfg \
+	file://rk3506/rk3506-trim.cfg \
 "
 
+DEPENDS:append:luckfox-lyra-plus = " lz4-native"
+
 INSANE_SKIP:${PN}-src += "buildpaths"
+
