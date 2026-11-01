@@ -9,6 +9,7 @@ SRC_URI:append = "\
 SRC_URI:append:rock-5b-plus = " file://bootcmd_emmc.cfg"
 SRC_URI:append:radxa-zero-3e-custom = " file://bootcmd_sdcard.cfg"
 SRC_URI:append:stm32mp15-disco = " file://bootcmd_emmc.cfg"
+SRC_URI:append:rk3506 = " file://bootcmd_emmc.cfg"
 
 BRANCH:rk3506 = "main"
 SRCREV:rk3506 = "ede4c80c159acfd6038255c88922993fbde16d93"
