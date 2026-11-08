@@ -1,9 +1,7 @@
 From 2a59e1912860bad0d254ea70aaabbdab763863ab Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sat, 4 Jul 2026 02:27:31 +0000
-Upstream-Status: Pending
-Subject: [PATCH 4/4] rockchip: spl: Allow use of ROCKCHIP_SPL_RESERVE_IRAM on
- ARMv7
+Subject: [PATCH 4/4] rockchip: spl: Allow use of ROCKCHIP_SPL_RESERVE_IRAM on ARMv7
 
 Users of ROCKCHIP_SPL_RESERVE_IRAM started to be removed with the commit
 5ce94c74a6b5 ("rockchip: rk3399: defconfig: no need to reserve IRAM for
@@ -27,10 +25,12 @@ loaded without overwriting SPL.
 Move the .space statement prior to _start on ARMv7 to allow use of the
 ROCKCHIP_SPL_RESERVE_IRAM option on ARMv7.
 
+Upstream-Status: Pending
+
 Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
 ---
- arch/arm/include/asm/arch-rockchip/boot0.h | 9 ++++-----
- arch/arm/mach-rockchip/Kconfig             | 1 +
+ arch/arm/include/asm/arch-rockchip/boot0.h |    9 ++++-----
+ arch/arm/mach-rockchip/Kconfig             |    1 +
  2 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/include/asm/arch-rockchip/boot0.h b/arch/arm/include/asm/arch-rockchip/boot0.h

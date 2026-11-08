@@ -1,20 +1,26 @@
 From 3d3d69ec53cb43bd201e6f3c6fdb026faa5baed0 Mon Sep 17 00:00:00 2001
 From: Marcin Bober <mbober1@gmail.com>
 Date: Tue, 27 Oct 2026 16:23:25 +0000
-Subject: [PATCH] add luckfox-lyra-plus support
+Subject: [PATCH] arm: dts: rockchip: add Luckfox Lyra Plus (RK3506) support
+
+Add device trees for the RK3506 SoC, its pinctrl, and the Luckfox Lyra Plus
+board, together with the board binding and RK3506 support in the INNO USB2
+PHY driver.
+
 Upstream-Status: Pending
 
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
 ---
- .../devicetree/bindings/arm/rockchip.yaml     |    6 +
- .../bindings/phy/rockchip,inno-usb2phy.yaml   |    1 +
- arch/arm/boot/dts/rockchip/Makefile           |    3 +-
- .../dts/rockchip/rk3506-luckfox-lyra.dtsi     |  133 ++
- .../arm/boot/dts/rockchip/rk3506-pinctrl.dtsi | 1975 +++++++++++++++++
- arch/arm/boot/dts/rockchip/rk3506.dtsi        |  690 ++++++
- .../rockchip/rk3506g-luckfox-lyra-plus-sd.dts |   61 +
- arch/arm/mach-rockchip/rockchip.c             |    1 +
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c |  114 +
- 9 files changed, 2983 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/arm/rockchip.yaml          | 6 +
+ .../bindings/phy/rockchip,inno-usb2phy.yaml        | 1 +
+ arch/arm/boot/dts/rockchip/Makefile                | 3 ++
+ .../arm/boot/dts/rockchip/rk3506-luckfox-lyra.dtsi |  120 +
+ arch/arm/boot/dts/rockchip/rk3506-pinctrl.dtsi     | 1975 ++++++++++++++++++++
+ arch/arm/boot/dts/rockchip/rk3506.dtsi             |  692 +++++++
+ .../dts/rockchip/rk3506g-luckfox-lyra-plus-sd.dts  |   53 +
+ arch/arm/mach-rockchip/rockchip.c                  | 1 +
+ drivers/phy/rockchip/phy-rockchip-inno-usb2.c      |  114 +
+ 9 files changed, 2964 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/boot/dts/rockchip/rk3506-luckfox-lyra.dtsi
  create mode 100644 arch/arm/boot/dts/rockchip/rk3506-pinctrl.dtsi
  create mode 100644 arch/arm/boot/dts/rockchip/rk3506.dtsi

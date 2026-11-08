@@ -1,0 +1,39 @@
+From 7ced188ecd4809dd10f65d32172b9253c0b3fe62 Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Wed, 4 Nov 2026 20:44:23 +0000
+Subject: [PATCH] rk3506: add splash screen environment
+
+Keep the console off the panel and load the splash bitmap from the boot
+partition, so U-Boot shows the logo and never draws its banner over it.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ include/configs/rk3506_common.h |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/include/configs/rk3506_common.h b/include/configs/rk3506_common.h
+index c008fee8..4996e5d2 100644
+--- a/include/configs/rk3506_common.h
++++ b/include/configs/rk3506_common.h
+@@ -30,10 +30,18 @@
+ 	"ramdisk_addr_r=0x06000000\0"		\
+ 	"kernel_comp_size=0x2000000\0"
+ 
+ #define CFG_EXTRA_ENV_SETTINGS			\
+ 	"fdtfile=" CONFIG_DEFAULT_FDT_FILE "\0"	\
+ 	ENV_MEM_LAYOUT_SETTINGS			\
+ 	ROCKCHIP_DEVICE_SETTINGS		\
+-	"boot_targets=" BOOT_TARGETS "\0"
++	"boot_targets=" BOOT_TARGETS "\0"       \
++	"splashimage=0x05000000\0"               \
++	"splashsource=mmc_fs\0"                 \
++	"splashdevpart=0:3\0"                   \
++	"splashfile=/boot/logo.bmp\0"           \
++	"splashpos=m,m\0"                       \
++	"stdout=serial\0"                       \
++	"stdin=serial\0"                        \
++	"stderr=serial\0"
+ 
+ #endif /* __CONFIG_RK3506_COMMON_H */

@@ -1,9 +1,25 @@
+From: Marcin Bober <mbober1@gmail.com>
+Date: Fri, 30 Oct 2026 22:32:24 +0000
+Subject: [PATCH] pinctrl: rockchip: add RK3506 RM_IO support
+
+RK3506 routes many peripherals through RM_IO: the pad iomux selects one of
+the RM_IO functions and a per-RM_IO register in GRF_PMU then selects the
+actual peripheral signal.  Program the selector register when the mux value
+is above 15, encoding the signal as (mux - 15) like the vendor kernel.
+
 Upstream-Status: Inappropriate
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/pinctrl/pinctrl-rockchip.c |   42 ++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-rockchip.h |    1 +
+ 2 files changed, 43 insertions(+)
+
 diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
 index ba47b6f323cc..676a399a37da 100644
 --- a/drivers/pinctrl/pinctrl-rockchip.c
 +++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -1421,6 +1421,43 @@ static int rockchip_verify_mux(struct rockchip_pin_bank *bank,
+@@ -1421,6 +1421,38 @@ static int rockchip_verify_mux(struct rockchip_pin_bank *bank,
  	return 0;
  }
  
@@ -11,11 +27,6 @@ index ba47b6f323cc..676a399a37da 100644
 +#define RK3506_RMIO_IOMUX		7
 +#define RK3506_RMIO_SEL_OFFSET		0x80
 +
-+/*
-+ * RK3506 routes many peripherals through RM_IO: the pad iomux selects RM_IO
-+ * and a per-RM_IO register in GRF_PMU selects the peripheral signal. Mux
-+ * values above 15 encode that signal as (mux - 15), like the vendor kernel.
-+ */
 +static int rk3506_set_rmio(struct rockchip_pin_bank *bank, int pin, int func)
 +{
 +	static const u8 bank1_pins[] = {

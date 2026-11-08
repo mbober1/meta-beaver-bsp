@@ -1,0 +1,115 @@
+From e9f2c6293bb1a63588f3f6a3f1acfcf893d6bf53 Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Wed, 4 Nov 2026 20:40:15 +0000
+Subject: [PATCH] arm64: dts: rockchip: rk3506: add display controller nodes
+
+Describe the VOP, the MIPI DSI host and the D-PHY, and add the RM_IO pin
+groups that route I2C0 to the display connector.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ arch/arm/dts/rk3506-pinctrl.dtsi |   14 ++++++++
+ arch/arm/dts/rk3506.dtsi         |   65 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
+
+diff --git a/arch/arm/dts/rk3506-pinctrl.dtsi b/arch/arm/dts/rk3506-pinctrl.dtsi
+index 81a3750a..c0bf4cd4 100644
+--- a/arch/arm/dts/rk3506-pinctrl.dtsi
++++ b/arch/arm/dts/rk3506-pinctrl.dtsi
+@@ -272,4 +272,18 @@
+ 				<1 RK_PD1 6 &pcfg_pull_none>;
+ 		};
+ 	};
++
++        rm-io-display {
++                /omit-if-no-ref/
++                rm_io0_pins: rm-io0-pins {
++                        rockchip,pins =
++                                <0 RK_PA0 31 &pcfg_pull_none>;
++                };
++
++                /omit-if-no-ref/
++                rm_io1_pins: rm-io1-pins {
++                        rockchip,pins =
++                                <0 RK_PA1 30 &pcfg_pull_none>;
++                };
++        };
+ };
+diff --git a/arch/arm/dts/rk3506.dtsi b/arch/arm/dts/rk3506.dtsi
+index 075b9cf9..08ac78fa 100644
+--- a/arch/arm/dts/rk3506.dtsi
++++ b/arch/arm/dts/rk3506.dtsi
+@@ -584,6 +584,71 @@
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
+ 		};
++
++		vop: vop@ff600000 {
++			compatible = "rockchip,rk3506-vop";
++			reg = <0xff600000 0x200>, <0xff600a00 0x400>;
++			reg-names = "regs", "gamma_lut";
++			interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru ACLK_VOP>, <&cru DCLK_VOP>, <&cru HCLK_VOP>;
++			clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++			status = "disabled";
++
++			vop_out: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				vop_out_dsi: endpoint@0 {
++					reg = <0>;
++					remote-endpoint = <&dsi_in_vop>;
++				};
++			};
++		};
++
++		dsi: dsi@ff640000 {
++			compatible = "rockchip,rk3506-mipi-dsi";
++			reg = <0xff640000 0x10000>;
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_DSI_HOST>;
++			clock-names = "pclk";
++			resets = <&cru SRST_P_DSI_HOST>;
++			reset-names = "apb";
++			phys = <&dsi_dphy>;
++			phy-names = "dphy";
++			rockchip,grf = <&grf>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				dsi_in: port@0 {
++					reg = <0>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					dsi_in_vop: endpoint@0 {
++						reg = <0>;
++						remote-endpoint = <&vop_out_dsi>;
++					};
++				};
++			};
++		};
++
++		dsi_dphy: phy@ff670000 {
++			compatible = "rockchip,rk3506-dsi-dphy";
++			reg = <0xff670000 0x10000>, <0xff640000 0x10000>;
++			reg-names = "phy", "host";
++			clocks = <&cru CLK_REF_DPHY_TOP>, <&cru PCLK_DPHY>,
++				 <&cru PCLK_DSI_HOST>;
++			clock-names = "ref", "pclk", "pclk_host";
++			resets = <&cru SRST_P_DPHY>;
++			reset-names = "apb";
++			#phy-cells = <0>;
++			status = "disabled";
++		};
+ 	};
+ };
+ 

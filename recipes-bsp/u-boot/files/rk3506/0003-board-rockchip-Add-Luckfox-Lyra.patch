@@ -1,18 +1,21 @@
 From c82f16dbbdea36135fd350ff96d238237a256f99 Mon Sep 17 00:00:00 2001
-From: Marcin Bober <mbober@logitech.com>
+From: Marcin Bober <mbober1@gmail.com>
 Date: Tue, 27 Oct 2026 12:16:22 +0000
-Upstream-Status: Pending
 Subject: [PATCH 3/4] board: rockchip: Add Luckfox Lyra
 
 Cherry-picked from u-boot-kwiboo 940b9fe6802, RK3506B boards excluded.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
 ---
- .../dts/rk3506-luckfox-lyra-plus-u-boot.dtsi  |   3 +
- arch/arm/dts/rk3506-luckfox-lyra-plus.dts     |  31 ++++
- arch/arm/dts/rk3506-luckfox-lyra-u-boot.dtsi  |   8 +
- arch/arm/dts/rk3506-luckfox-lyra.dts          |   9 ++
- arch/arm/dts/rk3506-luckfox-lyra.dtsi         | 146 ++++++++++++++++++
- configs/luckfox-lyra-rk3506_defconfig         |  61 ++++++++
- doc/board/rockchip/rockchip.rst               |   3 +
+ arch/arm/dts/rk3506-luckfox-lyra-plus-u-boot.dtsi | 3 +++
+ arch/arm/dts/rk3506-luckfox-lyra-plus.dts         |   31 ++++
+ arch/arm/dts/rk3506-luckfox-lyra-u-boot.dtsi      |    8 +
+ arch/arm/dts/rk3506-luckfox-lyra.dts              |    9 +
+ arch/arm/dts/rk3506-luckfox-lyra.dtsi             |  146 +++++++++++++++++++++
+ configs/luckfox-lyra-rk3506_defconfig             |   61 +++++++++
+ doc/board/rockchip/rockchip.rst                   | 3 +++
  7 files changed, 261 insertions(+)
  create mode 100644 arch/arm/dts/rk3506-luckfox-lyra-plus-u-boot.dtsi
  create mode 100644 arch/arm/dts/rk3506-luckfox-lyra-plus.dts

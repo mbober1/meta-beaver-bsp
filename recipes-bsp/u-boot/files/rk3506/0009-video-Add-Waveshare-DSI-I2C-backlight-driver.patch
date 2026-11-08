@@ -1,0 +1,225 @@
+From 198b89f1bc9f35f64ba7b12f7a44b8f794efa57c Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Wed, 4 Nov 2026 20:37:28 +0000
+Subject: [PATCH] video: add Waveshare DSI I2C backlight driver
+
+Add a U-Boot driver for the MCU on the Waveshare DSI carrier board.  The MCU
+sits on I2C and controls the panel rails, the reset line and the backlight
+PWM.  Register writes are retried because the bus can fail transiently while
+the panel powers up.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/video/Kconfig                   |    8 +
+ drivers/video/Makefile                  | 1 +
+ drivers/video/waveshare-dsi-backlight.c |  168 +++++++++++++++++++++++++++++++
+ 3 files changed, 177 insertions(+)
+ create mode 100644 drivers/video/waveshare-dsi-backlight.c
+
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index de0197b2..3bb1e453 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -144,6 +144,14 @@ config BACKLIGHT_GPIO
+ 	  it understands the standard device tree
+ 	  (leds/backlight/gpio-backlight.txt)
+ 
++config BACKLIGHT_WAVESHARE_DSI
++	bool "Waveshare DSI panel I2C backlight"
++	depends on BACKLIGHT && DM_I2C
++	help
++	  Say Y to enable the backlight controller found on Waveshare DSI
++	  panel carrier boards.  The controller is accessed over I2C and
++	  also performs the panel power sequencing.
++
+ config VIDEO_BPP8
+ 	bool "Support 8-bit-per-pixel displays"
+ 	default y
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index 7a7b54e6..d4101814 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -7,6 +7,7 @@ ifdef CONFIG_DM
+ obj-$(CONFIG_$(PHASE_)BACKLIGHT) += backlight-uclass.o
+ obj-$(CONFIG_BACKLIGHT_GPIO) += backlight_gpio.o
+ obj-$(CONFIG_BACKLIGHT_PWM) += pwm_backlight.o
++obj-$(CONFIG_BACKLIGHT_WAVESHARE_DSI) += waveshare-dsi-backlight.o
+ obj-$(CONFIG_$(PHASE_)CONSOLE_NORMAL) += console_normal.o
+ obj-$(CONFIG_CONSOLE_ROTATION) += console_rotate.o
+ ifdef CONFIG_$(PHASE_)CONSOLE_NORMAL
+diff --git a/drivers/video/waveshare-dsi-backlight.c b/drivers/video/waveshare-dsi-backlight.c
+new file mode 100644
+index 00000000..3c2a86ad
+--- /dev/null
++++ b/drivers/video/waveshare-dsi-backlight.c
+@@ -0,0 +1,168 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#define LOG_CATEGORY UCLASS_PANEL_BACKLIGHT
++
++#include <backlight.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <i2c.h>
++#include <log.h>
++#include <linux/bitops.h>
++#include <linux/delay.h>
++
++#define WS_REG_TP		0x94
++#define WS_REG_LCD		0x95
++#define WS_REG_PWM		0x96
++
++#define WS_PWR_VCC		BIT(8)
++#define WS_PWR_VCC_1		BIT(9)
++#define WS_PWR_AVDD		BIT(0)
++#define WS_PWR_LCD_RESET	BIT(1)
++#define WS_PWR_BL_ENABLE	BIT(2)
++#define WS_PWR_IOVCC		BIT(4)
++
++#define WS_BL_MIN_BRIGHTNESS	5
++#define WS_BL_MAX_BRIGHTNESS	255
++#define WS_BL_DEFAULT_BRIGHTNESS 200
++
++#define WS_REG_WRITE_RETRIES    10
++#define WS_REG_WRITE_DELAY_MS   10
++
++struct waveshare_dsi_bl_priv {
++	u16 poweron_state;
++	unsigned int default_brightness;
++};
++
++static int waveshare_dsi_bl_reg_write(struct udevice *dev, uint reg, u8 value)
++{
++	int ret, i;
++
++	for (i = 0; i < WS_REG_WRITE_RETRIES; i++) {
++		ret = dm_i2c_reg_write(dev, reg, value);
++		if (!ret) {
++			if (i)
++				dev_info(dev, "MCU answered after %d retries\n", i);
++			return 0;
++		}
++
++		mdelay(WS_REG_WRITE_DELAY_MS);
++	}
++
++	dev_err(dev, "failed to write register 0x%02x: %d\n", reg, ret);
++
++	return ret;
++}
++
++static int waveshare_dsi_bl_write_state(struct udevice *dev)
++{
++	struct waveshare_dsi_bl_priv *priv = dev_get_priv(dev);
++	int ret;
++
++	ret = waveshare_dsi_bl_reg_write(dev, WS_REG_TP,
++					 priv->poweron_state >> 8);
++	if (ret)
++		return ret;
++
++	return waveshare_dsi_bl_reg_write(dev, WS_REG_LCD,
++					  priv->poweron_state & 0xff);
++}
++
++static int waveshare_dsi_bl_write_brightness(struct udevice *dev, int percent)
++{
++	int brightness;
++
++	if (percent <= 0)
++		brightness = 0;
++	else
++		brightness = DIV_ROUND_UP(percent * WS_BL_MAX_BRIGHTNESS, 100);
++
++	if (brightness && brightness < WS_BL_MIN_BRIGHTNESS)
++		brightness = WS_BL_MIN_BRIGHTNESS;
++
++	return waveshare_dsi_bl_reg_write(dev, WS_REG_PWM, brightness);
++}
++
++static int waveshare_dsi_bl_enable(struct udevice *dev)
++{
++	struct waveshare_dsi_bl_priv *priv = dev_get_priv(dev);
++
++	return waveshare_dsi_bl_write_brightness(dev,
++			priv->default_brightness * 100 / WS_BL_MAX_BRIGHTNESS);
++}
++
++static int waveshare_dsi_bl_set_brightness(struct udevice *dev, int percent)
++{
++	if (percent == BACKLIGHT_OFF)
++		percent = 0;
++	else if (percent == BACKLIGHT_MAX)
++		percent = 100;
++
++	return waveshare_dsi_bl_write_brightness(dev, percent);
++}
++
++static const struct backlight_ops waveshare_dsi_bl_ops = {
++	.enable		= waveshare_dsi_bl_enable,
++	.set_brightness	= waveshare_dsi_bl_set_brightness,
++};
++
++static int waveshare_dsi_bl_of_to_plat(struct udevice *dev)
++{
++	struct waveshare_dsi_bl_priv *priv = dev_get_priv(dev);
++	unsigned int brightness;
++
++	brightness = dev_read_u32_default(dev, "default-brightness-level",
++					  WS_BL_DEFAULT_BRIGHTNESS);
++	if (brightness > WS_BL_MAX_BRIGHTNESS)
++		brightness = WS_BL_MAX_BRIGHTNESS;
++
++	priv->default_brightness = brightness;
++
++	return 0;
++}
++
++static int waveshare_dsi_bl_probe(struct udevice *dev)
++{
++	struct waveshare_dsi_bl_priv *priv = dev_get_priv(dev);
++	int ret;
++
++	priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1;
++	ret = waveshare_dsi_bl_write_state(dev);
++	if (ret)
++		return ret;
++	mdelay(20);
++
++	priv->poweron_state |= WS_PWR_IOVCC | WS_PWR_AVDD;
++	ret = waveshare_dsi_bl_write_state(dev);
++	if (ret)
++		return ret;
++	mdelay(20);
++
++	priv->poweron_state |= WS_PWR_LCD_RESET;
++	ret = waveshare_dsi_bl_write_state(dev);
++	if (ret)
++		return ret;
++	mdelay(60);
++
++	priv->poweron_state |= WS_PWR_BL_ENABLE;
++	ret = waveshare_dsi_bl_write_state(dev);
++	if (ret)
++		return ret;
++	mdelay(20);
++
++	return waveshare_dsi_bl_reg_write(dev, WS_REG_PWM, 0);
++}
++
++static const struct udevice_id waveshare_dsi_bl_ids[] = {
++	{ .compatible = "waveshare,dsi-backlight" },
++	{ }
++};
++
++U_BOOT_DRIVER(waveshare_dsi_backlight) = {
++	.name		= "waveshare_dsi_backlight",
++	.id		= UCLASS_PANEL_BACKLIGHT,
++	.of_match	= waveshare_dsi_bl_ids,
++	.ops		= &waveshare_dsi_bl_ops,
++	.of_to_plat	= waveshare_dsi_bl_of_to_plat,
++	.probe		= waveshare_dsi_bl_probe,
++	.priv_auto	= sizeof(struct waveshare_dsi_bl_priv),
++};

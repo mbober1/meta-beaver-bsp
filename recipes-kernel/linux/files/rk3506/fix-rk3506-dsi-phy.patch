@@ -1,23 +1,38 @@
+From: Marcin Bober <mbober1@gmail.com>
+Date: Sun, 1 Nov 2026 11:40:47 +0000
+Subject: [PATCH] phy: rockchip: inno-dsidphy: fix RK3506 D-PHY bring-up
+
+The timing table is in Mbps while the PLL rate is in Hz, so the row lookup
+always picked the highest rate.  Also power the internal 1.2V LDO and the
+external D-PHY in the RK3506 glue before the host polls the PHY status,
+otherwise the link only trains on a later modeset and the panel stays black
+at boot.
+
 Upstream-Status: Inappropriate
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c |   16 +++++++++++-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c  |   29 ++++++++++++++++++++--
+ 2 files changed, 41 insertions(+), 4 deletions(-)
+
 diff --git a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
 --- a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
 +++ b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
-@@ -511,8 +511,9 @@
+@@ -511,8 +511,8 @@
  	 */
  	ta_wait = DIV_ROUND_UP(cfg->ta_get, t_txclkesc);
  
-+	/* timings[].rate is in Mbps, pll.rate is in Hz (cf. vendor driver). */
  	for (i = 0; i < inno->pdata->num_timings; i++)
 -		if (inno->pll.rate <= timings[i].rate)
 +		if (inno->pll.rate <= timings[i].rate * USEC_PER_SEC)
  			break;
  
  	if (i == inno->pdata->num_timings)
-@@ -664,6 +665,13 @@
+@@ -664,6 +665,12 @@
  	phy_update_bits(inno, REGISTER_PART_ANALOG, 0x00,
  			POWER_WORK_MASK, POWER_WORK_ENABLE);
  
-+	/* RK3506: the internal 1.2V LDO feeds the D-PHY and is off by default. */
 +	if (of_device_is_compatible(inno->dev->of_node,
 +				    "rockchip,rk3506-dsi-dphy")) {
 +		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x17, BIT(7), 0);
@@ -54,17 +69,16 @@ diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/r
  
  /*
   * Note these registers do not appear in the datasheet, they are
-@@ -304,6 +306,9 @@
+@@ -304,6 +306,8 @@
  	struct dw_mipi_dsi_plat_data pdata;
  
  	bool dsi_bound;
 +
-+	/* external D-PHY is powered up early, in dw_mipi_dsi_phy_init() */
 +	bool phy_powered_on;
  };
  
  static struct dw_mipi_dsi_rockchip *to_dsi(struct drm_encoder *encoder)
-@@ -417,13 +422,21 @@
+@@ -417,13 +422,17 @@
  	return DIV_ROUND_UP(ns * dsi->lane_mbps, 1000);
  }
  
@@ -77,10 +91,6 @@ diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/r
  
 -	if (dsi->phy)
 +	if (dsi->phy) {
-+		/*
-+		 * Power the external D-PHY before the host releases PHY reset
-+		 * and polls for lock, otherwise the first modeset times out.
-+		 */
 +		dw_mipi_dsi_phy_power_on(priv_data);
  		return 0;
 +	}

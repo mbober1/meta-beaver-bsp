@@ -1,7 +1,6 @@
 From 8a80fdcbd384de58f2c95029b529ea2d09b81683 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Wed, 5 Feb 2025 01:24:07 +0000
-Upstream-Status: Pending
 Subject: [PATCH 2/4] rockchip: rk3506: Enable use of SPL_OPTEE_IMAGE
 
 Vendor OP-TEE blob provides PSCI that is used to enable CPU cores on
@@ -12,13 +11,15 @@ Add initial support for loading OP-TEE firmware on RK3506. Reserve the
 first 1 MiB of DRAM for OP-TEE and use ROCKCHIP_SPL_RESERVE_IRAM to add
 padding to the start of SPL text area to allow loading OP-TEE to 0x1000.
 
+Upstream-Status: Pending
+
 Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
 ---
- arch/arm/dts/rk3506-u-boot.dtsi | 11 +++++++++++
- arch/arm/dts/rk3506.dtsi        |  8 ++++++++
- arch/arm/mach-rockchip/Kconfig  |  4 ++++
- arch/arm/mach-rockchip/sdram.c  |  5 ++++-
- include/configs/rk3506_common.h |  1 +
+ arch/arm/dts/rk3506-u-boot.dtsi |   11 +++++++++++
+ arch/arm/dts/rk3506.dtsi        |    8 ++++++++
+ arch/arm/mach-rockchip/Kconfig  |    4 ++++
+ arch/arm/mach-rockchip/sdram.c  |    5 ++++-
+ include/configs/rk3506_common.h |    1 +
  5 files changed, 28 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/dts/rk3506-u-boot.dtsi b/arch/arm/dts/rk3506-u-boot.dtsi

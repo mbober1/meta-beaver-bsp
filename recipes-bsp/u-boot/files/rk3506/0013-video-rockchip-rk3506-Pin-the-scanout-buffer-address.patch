@@ -1,0 +1,46 @@
+From 00dd56bf5bc94b398460b276a05df73359fa65ef Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Fri, 6 Nov 2026 13:02:48 +0000
+Subject: [PATCH] video: rockchip: rk3506: pin the scanout buffer address
+
+Linux exposes the same physical buffer as a simple-framebuffer so that the
+U-Boot splash stays on screen until the application replaces it.  Pin the
+scanout buffer to a fixed address instead of allocating it at the top of
+DRAM, which the kernel cannot know about.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+
+---
+ drivers/video/rockchip/rk3506_vop.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/video/rockchip/rk3506_vop.c b/drivers/video/rockchip/rk3506_vop.c
+index b2f3dcef..b5ea8a03 100644
+--- a/drivers/video/rockchip/rk3506_vop.c
++++ b/drivers/video/rockchip/rk3506_vop.c
+@@ -95,6 +95,9 @@ DECLARE_GLOBAL_DATA_PTR;
+ #define RK3506_HSYNC_POSITIVE		BIT(0)
+ #define RK3506_VSYNC_POSITIVE		BIT(1)
+ 
++#define RK3506_VOP_FB_BASE	0x05c00000
++#define RK3506_VOP_FB_SIZE	0x00400000
++
+ struct rk3506_vop_priv {
+ 	void __iomem *regs;
+ };
+@@ -203,8 +218,11 @@ static int rk3506_vop_bind(struct udevice *dev)
+ {
+ 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
+ 
+-	plat->size = 4 * (CONFIG_VIDEO_ROCKCHIP_MAX_XRES *
+-			  CONFIG_VIDEO_ROCKCHIP_MAX_YRES);
++	plat->base = RK3506_VOP_FB_BASE;
++	plat->size = RK3506_VOP_FB_SIZE;
++	plat->align = RK3506_VOP_FB_SIZE;
++
++	debug("%s: fb at %lx, %x bytes\n", __func__, plat->base, plat->size);
+ 
+ 	return 0;
+ }

@@ -1,0 +1,787 @@
+From 06f494e780544f5dae17655134b44d6cda5de2bf Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Wed, 4 Nov 2026 20:37:28 +0000
+Subject: [PATCH] video: rockchip: add RK3506 VOP-lite and MIPI DSI support
+
+The RK3506 has a cut-down VOP (VOP-lite) with a single DPI output wired to
+a DesignWare MIPI DSI host and an INNO D-PHY.  Add a display controller
+driver for the VOP, a DSI host driver for the RK3506 glue, and the SoC
+specific handling in the DesignWare DSI and INNO D-PHY drivers.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c |   51 +++-
+ drivers/video/rockchip/Kconfig                   |    9 +
+ drivers/video/rockchip/Makefile                  | 1 +
+ drivers/video/rockchip/dw_mipi_dsi_rockchip.c    |  109 +++++++-
+ drivers/video/rockchip/rk3506_mipi.c             |  134 +++++++++
+ drivers/video/rockchip/rk3506_vop.c              |  313 ++++++++++++++++++++++
+ 6 files changed, 605 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/video/rockchip/rk3506_mipi.c
+ create mode 100644 drivers/video/rockchip/rk3506_vop.c
+
+diff --git a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
+index 9aaca8a5..b190131b 100644
+--- a/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-dsidphy.c
+@@ -201,10 +201,16 @@ struct clk_hw {
+ 	const struct clk_init_data *init;
+ };
+ 
++#define RK3506_PRE_EMPHASIS_LANE_EN_MASK	GENMASK(6, 5)
++#define RK3506_PRE_EMPHASIS_LANE_EN		GENMASK(6, 5)
++#define RK3506_PRE_EMPHASIS_RANGE_MASK		GENMASK(7, 6)
++#define RK3506_PRE_EMPHASIS_RANGE_MID		0x1
++
+ struct inno_video_phy_plat_data {
+ 	const struct inno_mipi_dphy_timing *inno_mipi_dphy_timing_table;
+ 	const unsigned int num_timings;
+ 	enum phy_max_rate max_rate;
++	bool rk3506_pre_emphasis;
+ };
+ 
+ struct inno_dsidphy {
+@@ -384,6 +391,7 @@ static void inno_dsidphy_mipi_mode_enable(struct inno_dsidphy *inno)
+ 	u32 txbyteclkhs, txclkesc, esc_clk_div;
+ 	u32 hs_exit, clk_post, clk_pre, wakeup, lpx, ta_go, ta_sure, ta_wait;
+ 	u32 hs_prepare, hs_trail, hs_zero, clk_lane_hs_zero, data_lane_hs_zero;
++	u32 val;
+ 	unsigned int i;
+ 
+ 	timings = inno->pdata->inno_mipi_dphy_timing_table;
+@@ -407,6 +415,20 @@ static void inno_dsidphy_mipi_mode_enable(struct inno_dsidphy *inno)
+ 				CLOCK_LANE_VOD_RANGE_SET_MASK,
+ 				CLOCK_LANE_VOD_RANGE_SET(VOD_MAX_RANGE));
+ 	}
++	if (inno->pdata->rk3506_pre_emphasis) {
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x18,
++				RK3506_PRE_EMPHASIS_LANE_EN_MASK,
++				RK3506_PRE_EMPHASIS_LANE_EN);
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x19,
++				RK3506_PRE_EMPHASIS_RANGE_MASK,
++				RK3506_PRE_EMPHASIS_RANGE_MID << 6);
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x1a,
++				RK3506_PRE_EMPHASIS_RANGE_MASK,
++				RK3506_PRE_EMPHASIS_RANGE_MID << 6);
++		phy_update_bits(inno, REGISTER_PART_ANALOG, 0x1b,
++				RK3506_PRE_EMPHASIS_RANGE_MASK,
++				RK3506_PRE_EMPHASIS_RANGE_MID << 6);
++	}
+ 	/* Enable PLL and LDO */
+ 	phy_update_bits(inno, REGISTER_PART_ANALOG, 0x01,
+ 			REG_LDOPD_MASK | REG_PLLPD_MASK,
+@@ -532,10 +559,24 @@ static void inno_dsidphy_mipi_mode_enable(struct inno_dsidphy *inno)
+ 				T_TA_WAIT_CNT(ta_wait));
+ 	}
+ 
+-	/* Enable all lanes on analog part */
++	switch (inno->dphy_cfg.lanes) {
++	case 1:
++		val = LANE_EN_0;
++		break;
++	case 2:
++		val = LANE_EN_0 | LANE_EN_1;
++		break;
++	case 3:
++		val = LANE_EN_0 | LANE_EN_1 | LANE_EN_2;
++		break;
++	case 4:
++	default:
++		val = LANE_EN_0 | LANE_EN_1 | LANE_EN_2 | LANE_EN_3;
++		break;
++	}
++
+ 	phy_update_bits(inno, REGISTER_PART_ANALOG, 0x00,
+-			LANE_EN_MASK, LANE_EN_CK | LANE_EN_3 | LANE_EN_2 |
+-			LANE_EN_1 | LANE_EN_0);
++			LANE_EN_MASK, LANE_EN_CK | val);
+ }
+ 
+ static int inno_dsidphy_power_on(struct phy *phy)
+@@ -617,6 +664,13 @@ static const struct inno_video_phy_plat_data max_2_5ghz_video_phy_plat_data = {
+ 	.max_rate = MAX_2_5GHZ,
+ };
+ 
++static const struct inno_video_phy_plat_data rk3506_video_phy_plat_data = {
++	.inno_mipi_dphy_timing_table = inno_mipi_dphy_timing_table_max_2_5ghz,
++	.num_timings = ARRAY_SIZE(inno_mipi_dphy_timing_table_max_2_5ghz),
++	.max_rate = MAX_2_5GHZ,
++	.rk3506_pre_emphasis = true,
++};
++
+ static int inno_dsidphy_probe(struct udevice *dev)
+ {
+ 	struct inno_dsidphy *inno = dev_get_priv(dev);
+@@ -663,6 +717,9 @@ static const struct udevice_id inno_dsidphy_of_match[] = {
+ 	}, {
+ 		.compatible = "rockchip,rk3368-dsi-dphy",
+ 		.data = (long)&max_1ghz_video_phy_plat_data,
++	}, {
++		.compatible = "rockchip,rk3506-dsi-dphy",
++		.data = (long)&rk3506_video_phy_plat_data,
+ 	}, {
+ 		.compatible = "rockchip,rk3568-dsi-dphy",
+ 		.data = (long)&max_2_5ghz_video_phy_plat_data,
+diff --git a/drivers/video/rockchip/Kconfig b/drivers/video/rockchip/Kconfig
+index 41d249cb..1a58710c 100644
+--- a/drivers/video/rockchip/Kconfig
++++ b/drivers/video/rockchip/Kconfig
+@@ -78,4 +78,13 @@ config DISPLAY_ROCKCHIP_DW_MIPI
+ 	  Select the Designware MIPI DSI controller in use on some Rockchip
+ 	  SOCs.
+ 
++config VIDEO_ROCKCHIP_RK3506
++	bool "Rockchip RK3506 VOP-lite and MIPI DSI"
++	depends on VIDEO_ROCKCHIP
++	select DISPLAY_ROCKCHIP_DW_MIPI
++	help
++	  Support the RK3506 VOP-lite display controller and its MIPI DSI
++	  output.  The RK3506 VOP has a single window and cannot use the
++	  rk3288 register map, so it has its own small driver.
++
+ endif
+diff --git a/drivers/video/rockchip/Makefile b/drivers/video/rockchip/Makefile
+index f55becee..592c389c 100644
+--- a/drivers/video/rockchip/Makefile
++++ b/drivers/video/rockchip/Makefile
+@@ -18,4 +18,5 @@ obj-mipi-$(CONFIG_ROCKCHIP_RK3288) += rk3288_mipi.o
+ obj-mipi-$(CONFIG_ROCKCHIP_RK3399) += rk3399_mipi.o
+ obj-$(CONFIG_DISPLAY_ROCKCHIP_MIPI) += rk_mipi.o $(obj-mipi-y)
+ obj-$(CONFIG_DISPLAY_ROCKCHIP_DW_MIPI) += dw_mipi_dsi_rockchip.o
++obj-$(CONFIG_VIDEO_ROCKCHIP_RK3506) += rk3506_vop.o rk3506_mipi.o
+ endif
+diff --git a/drivers/video/rockchip/dw_mipi_dsi_rockchip.c b/drivers/video/rockchip/dw_mipi_dsi_rockchip.c
+index fa512173..51afe566 100644
+--- a/drivers/video/rockchip/dw_mipi_dsi_rockchip.c
++++ b/drivers/video/rockchip/dw_mipi_dsi_rockchip.c
+@@ -201,6 +201,21 @@ enum {
+ 	BIASEXTR_127_7,
+ };
+ 
++#define DSI_GRF_REG_FIELD(reg, lsb, msb)	\
++	(((reg) << 10) | ((lsb) << 5) | (msb))
++
++enum dsi_grf_reg_field {
++	DSI_GRF_DPIUPDATECFG,
++	DSI_GRF_DPISHUTDN,
++	DSI_GRF_DPICOLORM,
++	DSI_GRF_TURNDISABLE,
++	DSI_GRF_SKEWCALHS,
++	DSI_GRF_FORCETXSTOPMODE,
++	DSI_GRF_FORCERXMODE,
++	DSI_GRF_ENABLE_N,
++	DSI_GRF_MAX_FIELDS,
++};
++
+ struct rockchip_dw_dsi_chip_data {
+ 	u32 reg;
+ 
+@@ -216,8 +236,12 @@ struct rockchip_dw_dsi_chip_data {
+ 	u32 lanecfg2_grf_reg;
+ 	u32 lanecfg2;
+ 
++	const u32 *grf_reg_fields;
++
+ 	unsigned int flags;
+ 	unsigned int max_data_lanes;
++
++	const char *display_driver;
+ };
+ 
+ struct dw_rockchip_dsi_priv {
+@@ -544,10 +573,10 @@ dw_mipi_dsi_get_lane_mbps(void *priv_data, struct display_timing *timings,
+ 		return bpp;
+ 	}
+ 
+-	mpclk = DIV_ROUND_UP(timings->pixelclock.typ, 1000);
++	mpclk = DIV_ROUND_UP(timings->pixelclock.typ, USEC_PER_SEC);
+ 	if (mpclk) {
+ 		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
+-		tmp = (mpclk * (bpp / lanes) * 10 / 8) / 1000;
++		tmp = mpclk * (bpp / lanes) * 10 / 8;
+ 		if (tmp < max_mbps)
+ 			target_mbps = tmp;
+ 		else
+@@ -708,6 +743,41 @@ static const struct mipi_dsi_phy_ops dsi_rockchip_phy_ops = {
+ 	.post_set_mode = dsi_phy_post_set_mode,
+ };
+ 
++static void dw_mipi_dsi_rockchip_grf_field_write(struct dw_rockchip_dsi_priv *dsi,
++                                                 enum dsi_grf_reg_field index,
++                                                 u32 val)
++{
++        const u32 field = dsi->cdata->grf_reg_fields[index];
++        u32 reg, lsb, msb, mask, data;
++
++        if (!field)
++                return;
++
++        reg = (field >> 10) & 0x3ffff;
++        lsb = (field >> 5) & 0x1f;
++        msb = field & 0x1f;
++        mask = GENMASK(msb, lsb);
++        data = (val << lsb) & mask;
++
++        writel((mask << 16) | data, dsi->grf + reg);
++}
++
++static void dw_mipi_dsi_rockchip_grf_config(struct dw_rockchip_dsi_priv *dsi)
++{
++        static const u32 lane_enable_map[] = { 0x0, 0x1, 0x3, 0x7, 0xf };
++        u32 lanes = dsi->device.lanes;
++
++        if (lanes >= ARRAY_SIZE(lane_enable_map))
++                lanes = 1;
++
++        dw_mipi_dsi_rockchip_grf_field_write(dsi, DSI_GRF_TURNDISABLE, 0);
++        dw_mipi_dsi_rockchip_grf_field_write(dsi, DSI_GRF_FORCETXSTOPMODE, 0);
++        dw_mipi_dsi_rockchip_grf_field_write(dsi, DSI_GRF_FORCERXMODE, 0);
++        dw_mipi_dsi_rockchip_grf_field_write(dsi, DSI_GRF_ENABLE_N,
++                                             lane_enable_map[lanes]);
++        dw_mipi_dsi_rockchip_grf_field_write(dsi, DSI_GRF_DPISHUTDN, 0);
++}
++
+ static int dw_mipi_dsi_rockchip_attach(struct udevice *dev)
+ {
+ 	struct dw_rockchip_dsi_priv *priv = dev_get_priv(dev);
+@@ -728,6 +811,9 @@ static int dw_mipi_dsi_rockchip_attach(struct udevice *dev)
+ 	device->format = mplat->format;
+ 	device->mode_flags = mplat->mode_flags;
+ 
++	if (priv->cdata->grf_reg_fields)
++		dw_mipi_dsi_rockchip_grf_config(priv);
++
+ 	ret = panel_get_display_timing(priv->panel, &timings);
+ 	if (ret) {
+ 		ret = ofnode_decode_display_timing(dev_ofnode(priv->panel),
+@@ -793,6 +880,8 @@ static void dw_mipi_dsi_rockchip_config(struct dw_rockchip_dsi_priv *dsi)
+ 
+ static int dw_mipi_dsi_rockchip_bind(struct udevice *dev)
+ {
++	const struct rockchip_dw_dsi_chip_data *cdata =
++		(const struct rockchip_dw_dsi_chip_data *)dev_get_driver_data(dev);
+ 	int ret;
+ 
+ 	ret = device_bind_driver_to_node(dev, "dw_mipi_dsi", "dsihost",
+@@ -802,6 +891,11 @@ static int dw_mipi_dsi_rockchip_bind(struct udevice *dev)
+ 		return ret;
+ 	}
+ 
++	if (cdata && cdata->display_driver &&
++	    device_bind_driver_to_node(dev, cdata->display_driver,
++				       "rk3506_display", dev_ofnode(dev), NULL))
++		dev_warn(dev, "failed to bind '%s'\n", cdata->display_driver);
++
+ 	return dm_scan_fdt_dev(dev);
+ }
+ 
+@@ -979,14 +1080,41 @@ static const struct rockchip_dw_dsi_chip_data rk3568_chip_data[] = {
+ 	{ /* sentinel */ }
+ };
+ 
++static const u32 rk3506_dsi_grf_reg_fields[DSI_GRF_MAX_FIELDS] = {
++        [DSI_GRF_DPIUPDATECFG]                = DSI_GRF_REG_FIELD(0x0014, 2, 2),
++        [DSI_GRF_DPICOLORM]                = DSI_GRF_REG_FIELD(0x0014, 1, 1),
++        [DSI_GRF_DPISHUTDN]                = DSI_GRF_REG_FIELD(0x0014, 0, 0),
++        [DSI_GRF_SKEWCALHS]                = DSI_GRF_REG_FIELD(0x0018, 11, 15),
++        [DSI_GRF_FORCETXSTOPMODE]        = DSI_GRF_REG_FIELD(0x0018, 4, 7),
++        [DSI_GRF_TURNDISABLE]                = DSI_GRF_REG_FIELD(0x0018, 2, 2),
++        [DSI_GRF_FORCERXMODE]                = DSI_GRF_REG_FIELD(0x0018, 0, 0),
++        [DSI_GRF_ENABLE_N]                = DSI_GRF_REG_FIELD(0x0018, 8, 9),
++};
++
++static const struct rockchip_dw_dsi_chip_data rk3506_chip_data[] = {
++        {
++                .reg = 0xff640000,
++
++                .grf_reg_fields = rk3506_dsi_grf_reg_fields,
++
++                .max_data_lanes = 4,
++
++                .display_driver = "rk3506_mipi_dsi",
++        },
++        { /* sentinel */ }
++};
++
+ static const struct udevice_id dw_mipi_dsi_rockchip_dt_ids[] = {
+-	{ .compatible = "rockchip,rk3399-mipi-dsi",
+-	  .data = (long)&rk3399_chip_data,
+-	},
+-	{ .compatible = "rockchip,rk3568-mipi-dsi",
+-	  .data = (long)&rk3568_chip_data,
+-	},
+-	{ /* sentinel */ }
++        { .compatible = "rockchip,rk3399-mipi-dsi",
++          .data = (long)&rk3399_chip_data,
++        },
++        { .compatible = "rockchip,rk3506-mipi-dsi",
++          .data = (long)&rk3506_chip_data,
++        },
++        { .compatible = "rockchip,rk3568-mipi-dsi",
++          .data = (long)&rk3568_chip_data,
++        },
++        { /* sentinel */ }
+ };
+ 
+ U_BOOT_DRIVER(dw_mipi_dsi_rockchip) = {
+diff --git a/drivers/video/rockchip/rk3506_mipi.c b/drivers/video/rockchip/rk3506_mipi.c
+new file mode 100644
+index 00000000..2849ca7b
+--- /dev/null
++++ b/drivers/video/rockchip/rk3506_mipi.c
+@@ -0,0 +1,134 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#include <display.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <dsi_host.h>
++#include <log.h>
++#include <mipi_dsi.h>
++#include <panel.h>
++#include <video_bridge.h>
++#include <linux/delay.h>
++
++static int rk3506_dsi_send_init_seq(struct mipi_dsi_device *dsi,
++				    struct udevice *panel)
++{
++	const u8 *data;
++	int len = 0;
++	int ret;
++
++	data = dev_read_prop(panel, "panel-init-sequence", &len);
++	if (!data || len <= 0)
++		return 0;
++
++	while (len >= 3) {
++		u8 delay = data[1];
++		u8 plen = data[2];
++
++		if (plen == 0 || plen > len - 3) {
++			dev_err(panel, "malformed panel-init-sequence\n");
++			return -EINVAL;
++		}
++
++		ret = mipi_dsi_dcs_write_buffer(dsi, &data[3], plen);
++		if (ret < 0) {
++			dev_err(panel, "failed to send DCS command 0x%02x: %d\n",
++				data[3], ret);
++			return ret;
++		}
++
++		if (delay)
++			mdelay(delay);
++
++		len -= 3 + plen;
++		data += 3 + plen;
++	}
++
++	return 0;
++}
++
++static int rk3506_mipi_read_timing(struct udevice *dev,
++				   struct display_timing *timing)
++{
++	struct udevice *panel;
++	int ret;
++
++	ret = uclass_first_device_err(UCLASS_PANEL, &panel);
++	if (ret) {
++		dev_err(dev, "no panel device found: %d\n", ret);
++		return ret;
++	}
++
++	return panel_get_display_timing(panel, timing);
++}
++
++static int rk3506_mipi_enable(struct udevice *dev, int panel_bpp,
++			      const struct display_timing *timing)
++{
++	struct mipi_dsi_panel_plat *mplat;
++	struct udevice *panel, *bridge, *dsi_host;
++	int ret;
++
++	ret = uclass_first_device_err(UCLASS_PANEL, &panel);
++	if (ret) {
++		dev_err(dev, "no panel device found: %d\n", ret);
++		return ret;
++	}
++
++	ret = uclass_get_device_by_ofnode(UCLASS_VIDEO_BRIDGE, dev_ofnode(dev),
++					  &bridge);
++	if (ret) {
++		dev_err(dev, "no DSI bridge on this node: %d\n", ret);
++		return ret;
++	}
++
++	ret = video_bridge_attach(bridge);
++	if (ret) {
++		dev_err(dev, "failed to attach DSI bridge: %d\n", ret);
++		return ret;
++	}
++
++	mplat = dev_get_plat(panel);
++	if (mplat->device) {
++		ret = rk3506_dsi_send_init_seq(mplat->device, panel);
++		if (ret)
++			return ret;
++	}
++
++	ret = uclass_get_device(UCLASS_DSI_HOST, 0, &dsi_host);
++	if (ret) {
++		dev_err(dev, "no DSI host device found: %d\n", ret);
++		return ret;
++	}
++
++	ret = dsi_host_enable(dsi_host);
++	if (ret) {
++		dev_err(dev, "failed to enable DSI host: %d\n", ret);
++		return ret;
++	}
++
++	ret = panel_enable_backlight(panel);
++	if (ret && ret != -ENOSYS) {
++		dev_err(dev, "failed to enable panel backlight: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct dm_display_ops rk3506_mipi_ops = {
++	.read_timing	= rk3506_mipi_read_timing,
++	.enable		= rk3506_mipi_enable,
++};
++
++static const struct udevice_id rk3506_mipi_ids[] = {
++	{ .compatible = "rockchip,rk3506-mipi-dsi" },
++	{ }
++};
++
++U_BOOT_DRIVER(rk3506_mipi_dsi) = {
++	.name		= "rk3506_mipi_dsi",
++	.id		= UCLASS_DISPLAY,
++	.of_match	= rk3506_mipi_ids,
++	.ops		= &rk3506_mipi_ops,
++};
+diff --git a/drivers/video/rockchip/rk3506_vop.c b/drivers/video/rockchip/rk3506_vop.c
+new file mode 100644
+index 00000000..b2f3dcef
+--- /dev/null
++++ b/drivers/video/rockchip/rk3506_vop.c
+@@ -0,0 +1,313 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#include <clk.h>
++#include <display.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <dm/device-internal.h>
++#include <dm/uclass-internal.h>
++#include <log.h>
++#include <reset.h>
++#include <video.h>
++#include <asm/global_data.h>
++#include <asm/io.h>
++#include <linux/bitops.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++#define RK3506_REG_CFG_DONE		0x0000
++#define RK3506_DSP_BG			0x0008
++#define RK3506_SYS_CTRL1		0x0014
++#define RK3506_SYS_CTRL2		0x0018
++#define RK3506_DSP_CTRL0		0x0020
++#define RK3506_DSP_CTRL2		0x0028
++#define RK3506_WIN1_CTRL0		0x0090
++#define RK3506_WIN1_VIR			0x0098
++#define RK3506_WIN1_MST			0x00a0
++#define RK3506_WIN1_DSP_INFO		0x00a4
++#define RK3506_WIN1_DSP_ST		0x00a8
++#define RK3506_WIN1_ALPHA_CTRL		0x00bc
++#define RK3506_DSP_HTOTAL_HS_END	0x0100
++#define RK3506_DSP_HACT_ST_END		0x0104
++#define RK3506_DSP_VTOTAL_VS_END	0x0108
++#define RK3506_DSP_VACT_ST_END		0x010c
++
++#define RK3506_AXI_MAX_OUTSTANDING_EN	BIT(12)
++#define RK3506_AXI_OUTSTANDING_MAX_NUM	(0x1f << 16)
++#define RK3506_AXI_OUTSTANDING_MAX	30
++
++#define RK3506_STANDBY_EN		BIT(1)
++#define RK3506_DSP_OUTZERO		BIT(3)
++
++#define RK3506_MIPI_EN			BIT(24)
++#define RK3506_MIPI_DCLK_POL		BIT(25)
++#define RK3506_MIPI_PIN_POL		(0x7 << 26)
++#define RK3506_MIPI_PIN_POL_SHIFT	26
++
++#define RK3506_DSP_BLANK		BIT(14)
++#define RK3506_DSP_BLACK		BIT(15)
++#define RK3506_OUT_MODE_MASK		(0xf << 16)
++
++#define RK3506_WIN1_EN			BIT(0)
++#define RK3506_WIN1_FMT_MASK		(0x7 << 4)
++#define RK3506_WIN1_FMT_SHIFT		4
++
++#define RK3506_FMT_ARGB8888		0
++#define RK3506_FMT_RGB888		1
++#define RK3506_FMT_RGB565		2
++
++#define RK3506_OUT_MODE_P888		0
++
++#define RK3506_V_HSYNC(x)		((x) & 0x1fff)
++#define RK3506_V_HORPRD(x)		(((x) & 0x1fff) << 16)
++#define RK3506_V_HEAP(x)		((x) & 0x1fff)
++#define RK3506_V_HASP(x)		(((x) & 0x1fff) << 16)
++#define RK3506_V_VSYNC(x)		((x) & 0x1fff)
++#define RK3506_V_VERPRD(x)		(((x) & 0x1fff) << 16)
++#define RK3506_V_VAEP(x)		((x) & 0x1fff)
++#define RK3506_V_VASP(x)		(((x) & 0x1fff) << 16)
++#define RK3506_V_DSP_WIDTH(x)		((x) & 0xffff)
++#define RK3506_V_DSP_HEIGHT(x)		(((x) & 0xffff) << 16)
++#define RK3506_V_DSP_XST(x)		((x) & 0xffff)
++#define RK3506_V_DSP_YST(x)		(((x) & 0xffff) << 16)
++
++#define RK3506_HSYNC_POSITIVE		BIT(0)
++#define RK3506_VSYNC_POSITIVE		BIT(1)
++
++struct rk3506_vop_priv {
++	void __iomem *regs;
++};
++
++static void rk3506_vop_mode_set(struct rk3506_vop_priv *priv, int bpp,
++				const struct display_timing *timing)
++{
++	void __iomem *regs = priv->regs;
++	u32 hactive = timing->hactive.typ;
++	u32 vactive = timing->vactive.typ;
++	u32 hsync = timing->hsync_len.typ;
++	u32 hback = timing->hback_porch.typ;
++	u32 hfront = timing->hfront_porch.typ;
++	u32 vsync = timing->vsync_len.typ;
++	u32 vback = timing->vback_porch.typ;
++	u32 vfront = timing->vfront_porch.typ;
++	u32 format;
++	u32 pin_pol = 0;
++
++	if (timing->flags & DISPLAY_FLAGS_HSYNC_HIGH)
++		pin_pol |= RK3506_HSYNC_POSITIVE;
++
++	if (timing->flags & DISPLAY_FLAGS_VSYNC_HIGH)
++		pin_pol |= RK3506_VSYNC_POSITIVE;
++
++	switch (bpp) {
++	case 16:
++		format = RK3506_FMT_RGB565;
++		break;
++	case 24:
++		format = RK3506_FMT_RGB888;
++		break;
++	case 32:
++	default:
++		format = RK3506_FMT_ARGB8888;
++		break;
++	}
++
++	writel(RK3506_V_HSYNC(hsync) |
++	       RK3506_V_HORPRD(hsync + hback + hactive + hfront),
++	       regs + RK3506_DSP_HTOTAL_HS_END);
++
++	writel(RK3506_V_HEAP(hsync + hback + hactive) |
++	       RK3506_V_HASP(hsync + hback),
++	       regs + RK3506_DSP_HACT_ST_END);
++
++	writel(RK3506_V_VSYNC(vsync) |
++	       RK3506_V_VERPRD(vsync + vback + vactive + vfront),
++	       regs + RK3506_DSP_VTOTAL_VS_END);
++
++	writel(RK3506_V_VAEP(vsync + vback + vactive) |
++	       RK3506_V_VASP(vsync + vback),
++	       regs + RK3506_DSP_VACT_ST_END);
++
++	clrsetbits_le32(regs + RK3506_DSP_CTRL2, RK3506_OUT_MODE_MASK,
++			RK3506_OUT_MODE_P888 << 16);
++	clrsetbits_le32(regs + RK3506_DSP_CTRL0,
++			RK3506_MIPI_PIN_POL | RK3506_MIPI_DCLK_POL,
++			((pin_pol & 0x7) << RK3506_MIPI_PIN_POL_SHIFT) |
++			RK3506_MIPI_DCLK_POL);
++	setbits_le32(regs + RK3506_DSP_CTRL0, RK3506_MIPI_EN);
++
++	clrbits_le32(regs + RK3506_DSP_CTRL2,
++		     RK3506_DSP_BLANK | RK3506_DSP_BLACK);
++
++	clrsetbits_le32(regs + RK3506_SYS_CTRL1,
++			RK3506_AXI_OUTSTANDING_MAX_NUM |
++			RK3506_AXI_MAX_OUTSTANDING_EN,
++			(RK3506_AXI_OUTSTANDING_MAX << 16) |
++			RK3506_AXI_MAX_OUTSTANDING_EN);
++
++	clrbits_le32(regs + RK3506_SYS_CTRL2,
++		     RK3506_STANDBY_EN | RK3506_DSP_OUTZERO);
++	writel(0, regs + RK3506_DSP_BG);
++
++	writel(hactive, regs + RK3506_WIN1_VIR);
++	writel(RK3506_V_DSP_XST(hsync + hback) |
++	       RK3506_V_DSP_YST(vsync + vback),
++	       regs + RK3506_WIN1_DSP_ST);
++	writel(RK3506_V_DSP_WIDTH(hactive - 1) |
++	       RK3506_V_DSP_HEIGHT(vactive - 1),
++	       regs + RK3506_WIN1_DSP_INFO);
++	writel(0, regs + RK3506_WIN1_ALPHA_CTRL);
++
++	clrsetbits_le32(regs + RK3506_WIN1_CTRL0,
++			RK3506_WIN1_FMT_MASK | RK3506_WIN1_EN,
++			(format << RK3506_WIN1_FMT_SHIFT) | RK3506_WIN1_EN);
++
++	writel(1, regs + RK3506_REG_CFG_DONE);
++}
++
++static int rk3506_vop_bind(struct udevice *dev)
++{
++	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
++
++	plat->size = 4 * (CONFIG_VIDEO_ROCKCHIP_MAX_XRES *
++			  CONFIG_VIDEO_ROCKCHIP_MAX_YRES);
++
++	return 0;
++}
++
++static int rk3506_vop_display_init(struct udevice *dev, ulong fbbase,
++				   ofnode ep_node)
++{
++	struct video_priv *uc_priv = dev_get_uclass_priv(dev);
++	struct rk3506_vop_priv *priv = dev_get_priv(dev);
++	struct display_plat *disp_uc_plat;
++	struct display_timing timing;
++	struct udevice *disp;
++	struct clk dclk;
++	ofnode remote;
++	u32 phandle;
++	int ret;
++
++	ret = ofnode_read_u32(ep_node, "remote-endpoint", &phandle);
++	if (ret) {
++		debug("%s: endpoint has no remote-endpoint\n", __func__);
++		return ret;
++	}
++
++	remote = ofnode_get_by_phandle(phandle);
++	if (!ofnode_valid(remote))
++		return -EINVAL;
++
++	for (;;) {
++		remote = ofnode_get_parent(remote);
++		if (!ofnode_valid(remote))
++			return -ENODEV;
++
++		if (!uclass_find_device_by_ofnode(UCLASS_DISPLAY, remote, &disp))
++			break;
++	}
++
++	disp_uc_plat = dev_get_uclass_plat(disp);
++	if (display_in_use(disp)) {
++		debug("%s: '%s' already in use\n", __func__, disp->name);
++		return -EBUSY;
++	}
++
++	disp_uc_plat->source_id = 0;
++	disp_uc_plat->src_dev = dev;
++
++	ret = device_probe(disp);
++	if (ret) {
++		debug("%s: '%s' failed to probe (ret=%d)\n", __func__,
++		      disp->name, ret);
++		return ret;
++	}
++
++	ret = display_read_timing(disp, &timing);
++	if (ret) {
++		debug("%s: failed to read timings (ret=%d)\n", __func__, ret);
++		return ret;
++	}
++
++	ret = clk_get_by_name(dev, "dclk_vop", &dclk);
++	if (!ret) {
++		ret = clk_set_rate(&dclk, timing.pixelclock.typ);
++		if (ret && ret != -ENOSYS)
++			dev_warn(dev, "failed to set dclk_vop to %u Hz: %d\n",
++				 timing.pixelclock.typ, ret);
++	}
++
++	rk3506_vop_mode_set(priv, 32, &timing);
++
++	ret = display_enable(disp, 32, &timing);
++	if (ret) {
++		dev_err(dev, "failed to enable '%s' (ret=%d)\n", disp->name, ret);
++		return ret;
++	}
++
++	writel(fbbase, priv->regs + RK3506_WIN1_MST);
++	writel(1, priv->regs + RK3506_REG_CFG_DONE);
++
++	uc_priv->xsize = timing.hactive.typ;
++	uc_priv->ysize = timing.vactive.typ;
++	uc_priv->bpix = VIDEO_BPP32;
++
++	debug("%s: %ux%u @ %u Hz, fb=%lx\n", __func__, uc_priv->xsize,
++	      uc_priv->ysize, timing.pixelclock.typ, fbbase);
++
++	return 0;
++}
++
++static int rk3506_vop_probe(struct udevice *dev)
++{
++	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
++	struct rk3506_vop_priv *priv = dev_get_priv(dev);
++	ofnode port, ep;
++	int ret = -ENODEV;
++
++	if (!(gd->flags & GD_FLG_RELOC))
++		return 0;
++
++	priv->regs = dev_read_addr_ptr(dev);
++	if (!priv->regs) {
++		dev_err(dev, "missing register base\n");
++		return -EINVAL;
++	}
++
++	port = dev_read_subnode(dev, "port");
++	if (!ofnode_valid(port)) {
++		dev_err(dev, "missing 'port' subnode\n");
++		return -EINVAL;
++	}
++
++	for (ep = ofnode_first_subnode(port);
++	     ofnode_valid(ep);
++	     ep = ofnode_next_subnode(ep)) {
++		ret = rk3506_vop_display_init(dev, plat->base, ep);
++		if (!ret)
++			break;
++		debug("%s: endpoint '%s' failed: %d\n", __func__,
++		      ofnode_get_name(ep), ret);
++	}
++
++	if (ret)
++		return ret;
++
++	video_set_flush_dcache(dev, 1);
++
++	return 0;
++}
++
++static const struct udevice_id rk3506_vop_ids[] = {
++	{ .compatible = "rockchip,rk3506-vop" },
++	{ }
++};
++
++U_BOOT_DRIVER(rk3506_vop) = {
++	.name		= "rk3506_vop",
++	.id		= UCLASS_VIDEO,
++	.of_match	= rk3506_vop_ids,
++	.bind		= rk3506_vop_bind,
++	.probe		= rk3506_vop_probe,
++	.priv_auto	= sizeof(struct rk3506_vop_priv),
++};

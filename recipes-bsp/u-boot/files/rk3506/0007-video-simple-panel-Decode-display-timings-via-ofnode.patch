@@ -1,0 +1,48 @@
+From 2bd050d0082a87214e72db21a04d70eaed56cac2 Mon Sep 17 00:00:00 2001
+From: Marcin Bober <mbober1@gmail.com>
+Date: Thu, 5 Nov 2026 18:40:13 +0000
+Subject: [PATCH] video: simple-panel: decode display timings via ofnode
+
+dev_of_offset() is only valid on a flat device tree.  With CONFIG_OF_LIVE
+the ofnode carries a node pointer, so pass the ofnode to
+ofnode_decode_display_timing() instead of re-deriving an offset.  Otherwise
+the timing lookup fails and the driver falls back to EDID.
+
+Upstream-Status: Pending
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/video/simple_panel.c |   13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/video/simple_panel.c b/drivers/video/simple_panel.c
+index 1cf587f9..a825e4eb 100644
+--- a/drivers/video/simple_panel.c
++++ b/drivers/video/simple_panel.c
+@@ -128,18 +128,21 @@ static int simple_panel_get_display_timing(struct udevice *dev,
+ {
+ 	const struct simple_panel_drv_data *data =
+ 		(const struct simple_panel_drv_data *)dev_get_driver_data(dev);
+-	const void *blob = gd->fdt_blob;
+ 	int ret;
+ 
+ 	/* Prefer the use of drm_display_mode if available */
+ 	if (data && data->modes && data->num_modes > 0)
+ 		return -ENODEV;
+ 
+-	/* Check for timing subnode in panel node */
+-	ret = fdtdec_decode_display_timing(blob, dev_of_offset(dev),
+-					   0, timings);
++	/*
++	 * Check for timing subnode in panel node.  Use the ofnode API rather
++	 * than fdtdec_decode_display_timing(gd->fdt_blob, dev_of_offset()):
++	 * with a live device tree the ofnode holds a node pointer, so
++	 * dev_of_offset() is not a valid offset and the lookup would fail.
++	 */
++	ret = ofnode_decode_display_timing(dev_ofnode(dev), 0, timings);
+ 	if (!ret)
+-		return ret;
++		return 0;
+ 
+ 	return simple_panel_get_edid_timing(dev, timings);
+ }

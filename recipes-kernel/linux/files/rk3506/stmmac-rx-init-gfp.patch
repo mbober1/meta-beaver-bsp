@@ -1,13 +1,20 @@
-Subject: [PATCH] stmmac: honor caller gfp flags for RX buffer allocation
+From: Marcin Bober <mbober1@gmail.com>
+Date: Tue, 27 Oct 2026 19:53:23 +0000
+Subject: [PATCH] net: stmmac: honor caller GFP flags for RX buffer allocation
 
 RX buffers were always allocated with GFP_ATOMIC, which fails when the free
-lists are empty even though reclaimable memory exists. The open path passes
+lists are empty even though reclaimable memory exists.  The open path passes
 GFP_KERNEL, so use the caller flags to allow reclaim during ring setup.
 
 Upstream-Status: Pending
 
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c	2026-10-27 19:51:04.600261154 +0000
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c	2026-10-27 19:51:09.048278803 +0000
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
 @@ -1657,7 +1657,7 @@
  {
  	struct stmmac_rx_queue *rx_q = &dma_conf->rx_queue[queue];

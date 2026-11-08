@@ -1,4 +1,19 @@
+From: Marcin Bober <mbober1@gmail.com>
+Date: Sun, 1 Nov 2026 09:03:06 +0000
+Subject: [PATCH] backlight: add Waveshare DSI panel I2C backlight driver
+
+The Waveshare 10.1in DSI carrier board exposes the panel rails, the reset
+line and the backlight PWM through a small MCU on I2C.  Add a backlight
+driver for it so Linux can control the panel brightness.
+
 Upstream-Status: Inappropriate
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/video/backlight/Kconfig                   |    8 +
+ drivers/video/backlight/Makefile                  | 1 +
+ drivers/video/backlight/waveshare-dsi-backlight.c |  160 +++++++++++++++++++++
+ 3 files changed, 169 insertions(+)
 
 diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
 --- a/drivers/video/backlight/Kconfig
@@ -31,18 +46,8 @@ new file mode 100644
 index 000000000000..111111111111
 --- /dev/null
 +++ b/drivers/video/backlight/waveshare-dsi-backlight.c
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,160 @@
 +// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Backlight driver for the Waveshare DSI panel I2C controller.
-+ *
-+ * The panel carrier board exposes a small I2C microcontroller (usually at
-+ * address 0x45) that controls panel power and the backlight PWM.  This is a
-+ * trimmed-down port of the Waveshare "touchscreen panel regulator" driver:
-+ * only the backlight/PWM part is needed here, because the panel itself is
-+ * driven by the regular DSI panel driver and the touch controller is a
-+ * separate Goodix GT9271 on the same bus.
-+ */
 +
 +#include <linux/backlight.h>
 +#include <linux/delay.h>
@@ -56,7 +61,6 @@ index 000000000000..111111111111
 +#include <linux/regmap.h>
 +#include <linux/slab.h>
 +
-+/* I2C registers of the microcontroller. */
 +#define REG_TP		0x94
 +#define REG_LCD		0x95
 +#define REG_PWM		0x96
@@ -64,13 +68,8 @@ index 000000000000..111111111111
 +#define REG_ID		0x98
 +#define REG_VERSION	0x99
 +
-+/*
-+ * Bits of the 16-bit panel power state written to REG_TP (high byte) and
-+ * REG_LCD (low byte).
-+ */
 +#define WS_PWR_VCC		BIT(8)
 +#define WS_PWR_VCC_1		BIT(9)
-+/* Backlight enable; verified on the 10.1" panel carrier board. */
 +#define WS_PWR_BL_ENABLE	BIT(2)
 +
 +#define WS_BL_MIN_BRIGHTNESS	5
@@ -133,7 +132,6 @@ index 000000000000..111111111111
 +		return dev_err_probe(&client->dev, PTR_ERR(priv->regmap),
 +				     "failed to allocate register map\n");
 +
-+	/* Enable panel VCC and the backlight output stage. */
 +	priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1 | WS_PWR_BL_ENABLE;
 +	regmap_write(priv->regmap, REG_TP, priv->poweron_state >> 8);
 +	regmap_write(priv->regmap, REG_LCD, priv->poweron_state & 0xff);

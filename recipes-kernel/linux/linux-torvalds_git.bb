@@ -21,6 +21,7 @@ SRC_URI:append:luckfox-lyra-plus = " \
 	file://rk3506/add-waveshare-dsi-backlight.patch \
 	file://rk3506/fix-rk3506-dsi-phy.patch \
 	file://rk3506/fix-waveshare-10-1-panel.patch \
+	file://rk3506/preserve-boot-splash.patch \
 	file://rk3506/rk3506.cfg \
 	file://rk3506/rk3506-trim.cfg \
 "

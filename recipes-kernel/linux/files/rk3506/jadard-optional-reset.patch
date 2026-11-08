@@ -1,4 +1,17 @@
+From: Marcin Bober <mbober1@gmail.com>
+Date: Fri, 30 Oct 2026 22:32:14 +0000
+Subject: [PATCH] drm: panel: jadard-jd9365da: make the reset GPIO optional
+
+On the Waveshare carrier board the panel reset is driven by the backlight
+MCU, so there is no reset GPIO to claim.  Request it optionally.
+
 Upstream-Status: Inappropriate
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 diff --git a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
 index 5202c1ffc6e1..28775f34360c 100644
 --- a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c

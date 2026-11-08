@@ -1,0 +1,80 @@
+From: Marcin Bober <mbober1@gmail.com>
+Date: Fri, 6 Nov 2026 13:12:47 +0000
+Subject: [PATCH] backlight: waveshare-dsi: preserve the bootloader panel state
+
+When U-Boot has already powered the panel, repeating the power sequence
+would cycle the MCU outputs and make the boot splash blink.  Add a
+"waveshare,preserve-boot-state" property that skips the rails, reset and
+enable steps and only drives the PWM register.
+
+Upstream-Status: Inappropriate
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+---
+ drivers/video/backlight/waveshare-dsi-backlight.c | 53 +++++++++++++----------
+ 1 file changed, 30 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/video/backlight/waveshare-dsi-backlight.c b/drivers/video/backlight/waveshare-dsi-backlight.c
+index e92527b973de..4dc59c995808 100644
+--- a/drivers/video/backlight/waveshare-dsi-backlight.c
++++ b/drivers/video/backlight/waveshare-dsi-backlight.c
+@@ -99,29 +99,36 @@ static int waveshare_dsi_backlight_probe(struct i2c_client *client)
+ 		return dev_err_probe(&client->dev, PTR_ERR(priv->regmap),
+ 				     "failed to allocate register map\n");
+ 
+-	priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1;
+-	ret = waveshare_dsi_backlight_write_state(priv);
+-	if (ret)
+-		return ret;
+-	msleep(20);
+-
+-	priv->poweron_state |= WS_PWR_IOVCC | WS_PWR_AVDD;
+-	ret = waveshare_dsi_backlight_write_state(priv);
+-	if (ret)
+-		return ret;
+-	msleep(20);
+-
+-	priv->poweron_state |= WS_PWR_LCD_RESET;
+-	ret = waveshare_dsi_backlight_write_state(priv);
+-	if (ret)
+-		return ret;
+-	msleep(60);
+-
+-	priv->poweron_state |= WS_PWR_BL_ENABLE;
+-	ret = waveshare_dsi_backlight_write_state(priv);
+-	if (ret)
+-		return ret;
+-	usleep_range(20000, 25000);
++	if (device_property_read_bool(&client->dev,
++				      "waveshare,preserve-boot-state")) {
++		priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1 |
++				      WS_PWR_IOVCC | WS_PWR_AVDD |
++				      WS_PWR_LCD_RESET | WS_PWR_BL_ENABLE;
++	} else {
++		priv->poweron_state = WS_PWR_VCC | WS_PWR_VCC_1;
++		ret = waveshare_dsi_backlight_write_state(priv);
++		if (ret)
++			return ret;
++		msleep(20);
++
++		priv->poweron_state |= WS_PWR_IOVCC | WS_PWR_AVDD;
++		ret = waveshare_dsi_backlight_write_state(priv);
++		if (ret)
++			return ret;
++		msleep(20);
++
++		priv->poweron_state |= WS_PWR_LCD_RESET;
++		ret = waveshare_dsi_backlight_write_state(priv);
++		if (ret)
++			return ret;
++		msleep(60);
++
++		priv->poweron_state |= WS_PWR_BL_ENABLE;
++		ret = waveshare_dsi_backlight_write_state(priv);
++		if (ret)
++			return ret;
++		usleep_range(20000, 25000);
++	}
+ 
+ 	if (!regmap_read(priv->regmap, REG_ID, &val))
+ 		dev_info(&client->dev, "waveshare panel hw id = 0x%x\n", val);
