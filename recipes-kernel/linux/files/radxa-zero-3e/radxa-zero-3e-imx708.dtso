@@ -1,0 +1,149 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Raspberry Pi Camera Module 3 (Sony IMX708 + DW9817 VCM) on the
+ * Radxa ZERO 3E CSI connector.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/rk3568-cru.h>
+#include <dt-bindings/power/rk3568-power.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/media/video-interfaces.h>
+
+&{/} {
+	clk_cam_24m: external-camera-clock-24m {
+		compatible = "fixed-clock";
+		clock-frequency = <24000000>;
+		clock-output-names = "clk_cam_24m";
+		#clock-cells = <0>;
+	};
+
+	cam_3v3: regulator-cam-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_3v3";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		regulator-always-on;
+		regulator-boot-on;
+		enable-active-high;
+		gpio = <&gpio3 RK_PC6 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam0_pwr_en>;
+		vin-supply = <&vcc_3v3>;
+	};
+};
+
+&pinctrl {
+	cam0 {
+		cam0_pwr_en: cam0-pwr-en {
+			rockchip,pins = <3 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		i2c2_cam_xfer: i2c2-cam-xfer {
+			rockchip,pins = <4 RK_PB5 1 &pcfg_pull_none_smt>,
+					<4 RK_PB4 1 &pcfg_pull_none_smt>;
+		};
+	};
+};
+
+&i2c2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_cam_xfer>;
+
+	imx708: camera@1a {
+		compatible = "sony,imx708";
+		reg = <0x1a>;
+		status = "okay";
+
+		clocks = <&clk_cam_24m>;
+		clock-names = "inclk";
+
+		vana1-supply = <&cam_3v3>;
+		vana2-supply = <&cam_3v3>;
+		vdig-supply = <&cam_3v3>;
+		vddl-supply = <&cam_3v3>;
+
+		lens-focus = <&vcm>;
+
+		port {
+			imx708_out: endpoint {
+				remote-endpoint = <&csi_input>;
+				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+				clock-noncontinuous;
+				link-frequencies = /bits/ 64 <450000000>;
+			};
+		};
+	};
+
+	vcm: lens@c {
+		compatible = "dongwoon,dw9817-vcm";
+		reg = <0x0c>;
+		status = "okay";
+		VDD-supply = <&cam_3v3>;
+	};
+};
+
+&{/} {
+	csi: csi@fdfb0000 {
+		compatible = "rockchip,rk3568-mipi-csi2";
+		reg = <0x0 0xfdfb0000 0x0 0x10000>;
+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "err1", "err2";
+		clocks = <&cru PCLK_CSI2HOST1>;
+		phys = <&csi_dphy>;
+		power-domains = <&power RK3568_PD_VI>;
+		resets = <&cru SRST_P_CSI2HOST1>;
+		status = "okay";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			csi_in: port@0 {
+				reg = <0>;
+
+				csi_input: endpoint {
+					remote-endpoint = <&imx708_out>;
+					bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+					clock-lanes = <0>;
+					data-lanes = <1 2>;
+					clock-noncontinuous;
+				};
+			};
+
+			csi_out: port@1 {
+				reg = <1>;
+
+				csi_output: endpoint {
+					remote-endpoint = <&vicap_mipi_in>;
+				};
+			};
+		};
+	};
+};
+
+&csi_dphy {
+	status = "okay";
+};
+
+&vicap {
+	status = "okay";
+};
+
+&vicap_mipi {
+	vicap_mipi_in: endpoint {
+		remote-endpoint = <&csi_output>;
+	};
+};
+
+&vicap_mmu {
+	status = "okay";
+};
