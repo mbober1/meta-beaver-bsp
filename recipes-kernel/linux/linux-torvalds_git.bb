@@ -26,7 +26,15 @@ SRC_URI:append:luckfox-lyra-plus = " \
 	file://rk3506/rk3506-trim.cfg \
 "
 
+SRC_URI:append:radxa-zero-3e-custom = " \
+	file://radxa-zero-3e/rk3566-trim.cfg \
+"
+
 DEPENDS:append:luckfox-lyra-plus = " lz4-native"
+DEPENDS:append:radxa-zero-3e-custom = " lzop-native"
+
+FIT_KERNEL_COMP_ALG:radxa-zero-3e-custom = "lzo"
+FIT_KERNEL_COMP_ALG_EXTENSION:radxa-zero-3e-custom = ".lzo"
 
 INSANE_SKIP:${PN}-src += "buildpaths"
 
