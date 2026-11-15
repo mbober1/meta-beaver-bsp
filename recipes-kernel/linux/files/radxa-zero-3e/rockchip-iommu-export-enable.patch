@@ -1,0 +1,56 @@
+From: BeaverOS <dev@beaveros.invalid>
+Subject: [PATCH] iommu/rockchip: export enable/disable helpers
+
+Vendor Rockchip kernels export rockchip_iommu_enable() and
+rockchip_iommu_disable() so out-of-tree media drivers can reprogram the
+IOMMU after resetting the VPU (the reset clears the page table base) and
+after power-domain cycles.
+
+Mainline keeps rk_iommu_enable()/rk_iommu_disable() static and only runs
+them from rk_iommu_attach_device() and the runtime-PM resume callback.
+Attach skips the enable when pm_runtime_get_if_in_use() reports the IOMMU
+device as not in use, and such a device never suspends either, so the
+resume callback never fires. RK_MMU_DTE_ADDR is then never written, the
+MMU stays disabled and the consumer's AXI transactions are issued with
+untranslated addresses, which the VPU reports as a bus error.
+
+Upstream-Status: Denied [vendor API, not intended for upstream]
+---
+ drivers/iommu/rockchip-iommu.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -975,7 +975,31 @@
+ 	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+ 	return ret;
+ }
+ 
++int rockchip_iommu_enable(struct device *dev)
++{
++	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
++
++	if (!iommu)
++		return -ENODEV;
++
++	return rk_iommu_enable(iommu);
++}
++EXPORT_SYMBOL_GPL(rockchip_iommu_enable);
++
++int rockchip_iommu_disable(struct device *dev)
++{
++	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
++
++	if (!iommu)
++		return -ENODEV;
++
++	rk_iommu_disable(iommu);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(rockchip_iommu_disable);
++
+ static int rk_iommu_identity_attach(struct iommu_domain *identity_domain,
+ 				    struct device *dev,
+ 				    struct iommu_domain *old)

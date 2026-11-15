@@ -1,0 +1,25 @@
+Subject: [PATCH] media: uapi: add MEDIA_BUS_FMT_SENSOR_DATA
+
+The backported Raspberry Pi IMX708 driver uses MEDIA_BUS_FMT_SENSOR_DATA
+for the sensor's embedded-data (ancillary metadata) stream. That symbol
+only exists in the Raspberry Pi kernel tree.
+
+Signed-off-by: Marcin Bober <mbober1@gmail.com>
+Upstream-Status: Inappropriate
+---
+diff --git a/include/uapi/linux/media-bus-format.h b/include/uapi/linux/media-bus-format.h
+--- a/include/uapi/linux/media-bus-format.h
++++ b/include/uapi/linux/media-bus-format.h
+@@ -179,7 +179,12 @@
+  * metadata format that is not configurable from userspace.
+  * Width and height will be set to 0 for this format.
+  */
+ #define MEDIA_BUS_FMT_METADATA_FIXED		0x7001
+ 
++/*
++ * Sensor ancillary metadata formats - next is 0x7002
++ */
++#define MEDIA_BUS_FMT_SENSOR_DATA		0x7002
++
+ /* Generic line based metadata formats for serial buses. Next is 0x8008. */
+ #define MEDIA_BUS_FMT_META_8			0x8001

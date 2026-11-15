@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/rk3568-cru.h>
+#include <dt-bindings/power/rk3568-power.h>
+
+&{/} {
+	mpp_srv: mpp-srv {
+		compatible = "rockchip,mpp-service";
+		rockchip,taskqueue-count = <6>;
+		rockchip,resetgroup-count = <6>;
+		status = "okay";
+	};
+
+	rkvenc: rkvenc@fdf40000 {
+		compatible = "rockchip,rkv-encoder-v1";
+		reg = <0x0 0xfdf40000 0x0 0x400>;
+		interrupts = <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "irq_enc";
+		clocks = <&cru ACLK_RKVENC>, <&cru HCLK_RKVENC>,
+			 <&cru CLK_RKVENC_CORE>;
+		clock-names = "aclk_vcodec", "hclk_vcodec", "clk_core";
+		resets = <&cru SRST_A_RKVENC>, <&cru SRST_H_RKVENC>,
+			 <&cru SRST_RKVENC_CORE>;
+		reset-names = "video_a", "video_h", "video_core";
+		assigned-clocks = <&cru ACLK_RKVENC>, <&cru CLK_RKVENC_CORE>;
+		assigned-clock-rates = <297000000>, <297000000>;
+		iommus = <&rkvenc_mmu>;
+		rockchip,srv = <&mpp_srv>;
+		rockchip,taskqueue-node = <3>;
+		rockchip,resetgroup-node = <3>;
+		rockchip,disable-auto-freq;
+		power-domains = <&power RK3568_PD_RKVENC>;
+		status = "okay";
+	};
+
+	rkvenc_mmu: iommu@fdf40f00 {
+		compatible = "rockchip,rk3568-iommu";
+		reg = <0x0 0xfdf40f00 0x0 0x40>,
+		      <0x0 0xfdf40f40 0x0 0x40>;
+		interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "rkvenc_mmu0", "rkvenc_mmu1";
+		clocks = <&cru ACLK_RKVENC>, <&cru HCLK_RKVENC>;
+		clock-names = "aclk", "iface";
+		power-domains = <&power RK3568_PD_RKVENC>;
+		#iommu-cells = <0>;
+		status = "okay";
+	};
+};

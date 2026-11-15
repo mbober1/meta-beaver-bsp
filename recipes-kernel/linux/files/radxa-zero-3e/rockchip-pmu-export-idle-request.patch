@@ -1,0 +1,65 @@
+From: BeaverOS <dev@beaveros.invalid>
+Subject: [PATCH] soc: rockchip: export rockchip_pmu_idle_request()
+
+Vendor Rockchip kernels export rockchip_pmu_idle_request() so media
+drivers can put a block into NIU idle before resetting it. Without that
+handshake the reset does not fully complete and the block starts timing
+out on the next task.
+
+Upstream-Status: Denied [vendor API, not intended for upstream]
+---
+ drivers/pmdomain/rockchip/pm-domains.c | 18 ++++++++++++++++++
+ include/soc/rockchip/pm_domains.h      |  6 ++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/drivers/pmdomain/rockchip/pm-domains.c b/drivers/pmdomain/rockchip/pm-domains.c
+--- a/drivers/pmdomain/rockchip/pm-domains.c
++++ b/drivers/pmdomain/rockchip/pm-domains.c
+@@ -453,6 +453,24 @@ static int rockchip_pmu_set_idle_request(struct rockchip_pm_domain *pd,
+ 	return 0;
+ }
+ 
++int rockchip_pmu_idle_request(struct device *dev, bool idle)
++{
++	struct rockchip_pm_domain *pd;
++	int ret;
++
++	if (!dev || !dev->pm_domain)
++		return -EINVAL;
++
++	pd = to_rockchip_pd(pd_to_genpd(dev->pm_domain));
++
++	mutex_lock(&pd->pmu->mutex);
++	ret = rockchip_pmu_set_idle_request(pd, idle);
++	mutex_unlock(&pd->pmu->mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(rockchip_pmu_idle_request);
++
+ static int rockchip_pmu_save_qos(struct rockchip_pm_domain *pd)
+ {
+ 	int i;
+diff --git a/include/soc/rockchip/pm_domains.h b/include/soc/rockchip/pm_domains.h
+--- a/include/soc/rockchip/pm_domains.h
++++ b/include/soc/rockchip/pm_domains.h
+@@ -10,6 +10,7 @@
+ 
+ int rockchip_pmu_block(void);
+ void rockchip_pmu_unblock(void);
++int rockchip_pmu_idle_request(struct device *dev, bool idle);
+ 
+ #else /* CONFIG_ROCKCHIP_PM_DOMAINS */
+ 
+@@ -20,6 +21,11 @@ static inline int rockchip_pmu_block(void)
+ 
+ static inline void rockchip_pmu_unblock(void) { }
+ 
++static inline int rockchip_pmu_idle_request(struct device *dev, bool idle)
++{
++	return -ENODEV;
++}
++
+ #endif /* CONFIG_ROCKCHIP_PM_DOMAINS */
+ 
+ #endif /* __SOC_ROCKCHIP_PM_DOMAINS_H__ */

@@ -9,14 +9,28 @@ Upstream-Status: Pending
 Signed-off-by: Marcin Bober <mbober1@gmail.com>
 
 ---
- drivers/media/i2c/dw9807-vcm.c | 185 ++++++++++++++++++++++++++-------
- 1 file changed, 147 insertions(+), 38 deletions(-)
+ drivers/media/i2c/dw9807-vcm.c | 225 ++++++++++++++++++++++++++++++++---------
+ 1 file changed, 180 insertions(+), 45 deletions(-)
 
 diff --git a/drivers/media/i2c/dw9807-vcm.c b/drivers/media/i2c/dw9807-vcm.c
-index 4148009e0e01..95deaa6a1d69 100644
+index 4148009e0e01..e4966e9b0edd 100644
 --- a/drivers/media/i2c/dw9807-vcm.c
 +++ b/drivers/media/i2c/dw9807-vcm.c
-@@ -7,6 +7,7 @@
+@@ -1,12 +1,21 @@
+ // SPDX-License-Identifier: GPL-2.0
+ // Copyright (C) 2018 Intel Corporation
+ 
++/*
++ * DW9807 is a 10-bit DAC driver, capable of sinking up to 100mA.
++ *
++ * DW9817 is a bidirectional 10-bit driver, driving up to +/- 100mA.
++ * Operationally it is identical to DW9807, except that the idle position is
++ * the mid-point, not 0.
++ */
++
+ #include <linux/acpi.h>
+ #include <linux/delay.h>
+ #include <linux/i2c.h>
  #include <linux/iopoll.h>
  #include <linux/module.h>
  #include <linux/pm_runtime.h>
@@ -24,7 +38,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  #include <media/v4l2-ctrls.h>
  #include <media/v4l2-device.h>
  
-@@ -38,10 +39,22 @@
+@@ -38,10 +47,22 @@
  
  #define MAX_RETRY		10
  
@@ -47,10 +61,18 @@ index 4148009e0e01..95deaa6a1d69 100644
  };
  
  static inline struct dw9807_device *sd_to_dw9807_vcm(
-@@ -109,6 +122,86 @@ static int dw9807_set_dac(struct i2c_client *client, u16 data)
+@@ -109,6 +130,102 @@ static int dw9807_set_dac(struct i2c_client *client, u16 data)
  	return 0;
  }
  
++/*
++ * The lens position is gradually moved in units of DW9807_CTRL_STEPS,
++ * to make the movements smoothly. In all cases, even when "start" and
++ * "end" are the same, the lens will be set to the "end" position.
++ *
++ * (We don't use hardware slew rate control, because it differs widely
++ * between otherwise-compatible ICs, and may need lens-specific tuning.)
++ */
 +static int dw9807_ramp(struct i2c_client *client, int start, int end)
 +{
 +	int step, val, ret;
@@ -83,6 +105,7 @@ index 4148009e0e01..95deaa6a1d69 100644
 +	const char tx_data[2] = { DW9807_CTL_ADDR, 0x00 };
 +	int ret;
 +
++	/* Power on */
 +	ret = i2c_master_send(client, tx_data, sizeof(tx_data));
 +	if (ret < 0) {
 +		dev_err(&client->dev, "I2C write CTL fail ret = %d\n", ret);
@@ -103,6 +126,7 @@ index 4148009e0e01..95deaa6a1d69 100644
 +	if (abs(dw9807_dev->current_val - dw9807_dev->idle_pos) > DW9807_CTRL_STEPS)
 +		dw9807_ramp(client, dw9807_dev->current_val, dw9807_dev->idle_pos);
 +
++	/* Power down */
 +	ret = i2c_master_send(client, tx_data, sizeof(tx_data));
 +	if (ret < 0) {
 +		dev_err(&client->dev, "I2C write CTL fail ret = %d\n", ret);
@@ -119,6 +143,12 @@ index 4148009e0e01..95deaa6a1d69 100644
 +		container_of(nb, struct dw9807_device, notifier);
 +
 +	if (action & REGULATOR_EVENT_ENABLE) {
++		/*
++		 * Initialisation delay between VDD low->high and the moment
++		 * when the i2c command is available.
++		 * From the datasheet, it should be 10ms + 2ms (max power
++		 * up sequence duration)
++		 */
 +		usleep_range(DW9807_PW_MIN_DELAY_US,
 +			     DW9807_PW_MIN_DELAY_US +
 +			     DW9807_PW_DELAY_RANGE_US);
@@ -134,7 +164,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  static int dw9807_set_ctrl(struct v4l2_ctrl *ctrl)
  {
  	struct dw9807_device *dev_vcm = container_of(ctrl->handler,
-@@ -116,9 +209,11 @@ static int dw9807_set_ctrl(struct v4l2_ctrl *ctrl)
+@@ -116,9 +233,11 @@ static int dw9807_set_ctrl(struct v4l2_ctrl *ctrl)
  
  	if (ctrl->id == V4L2_CID_FOCUS_ABSOLUTE) {
  		struct i2c_client *client = v4l2_get_subdevdata(&dev_vcm->sd);
@@ -147,7 +177,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  	}
  
  	return -EINVAL;
-@@ -163,7 +258,8 @@ static int dw9807_init_controls(struct dw9807_device *dev_vcm)
+@@ -163,7 +282,8 @@ static int dw9807_init_controls(struct dw9807_device *dev_vcm)
  	v4l2_ctrl_handler_init(hdl, 1);
  
  	v4l2_ctrl_new_std(hdl, ops, V4L2_CID_FOCUS_ABSOLUTE,
@@ -157,10 +187,15 @@ index 4148009e0e01..95deaa6a1d69 100644
  
  	dev_vcm->sd.ctrl_handler = hdl;
  	if (hdl->error) {
-@@ -175,9 +271,20 @@ static int dw9807_init_controls(struct dw9807_device *dev_vcm)
+@@ -175,9 +295,31 @@ static int dw9807_init_controls(struct dw9807_device *dev_vcm)
  	return 0;
  }
  
++/* Compatible devices; in fact there are many similar chips.
++ * "data" holds the powered-off (zero current) lens position and a
++ * default/initial control value (which need not be the same as the powered-off
++ * value).
++ */
 +static const struct dw9807_cfg dw9807_cfg = {
 +	.idle_pos = 0,
 +	.default_pos = 0
@@ -171,6 +206,12 @@ index 4148009e0e01..95deaa6a1d69 100644
 +	.default_pos = 480,
 +};
 +
++static const struct of_device_id dw9807_of_table[] = {
++	{ .compatible = "dongwoon,dw9807-vcm", .data = &dw9807_cfg },
++	{ .compatible = "dongwoon,dw9817-vcm", .data = &dw9817_cfg },
++	{ /* sentinel */ }
++};
++
  static int dw9807_probe(struct i2c_client *client)
  {
  	struct dw9807_device *dw9807_dev;
@@ -178,7 +219,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  	int rval;
  
  	dw9807_dev = devm_kzalloc(&client->dev, sizeof(*dw9807_dev),
-@@ -185,6 +292,30 @@ static int dw9807_probe(struct i2c_client *client)
+@@ -185,6 +327,30 @@ static int dw9807_probe(struct i2c_client *client)
  	if (dw9807_dev == NULL)
  		return -ENOMEM;
  
@@ -200,7 +241,7 @@ index 4148009e0e01..95deaa6a1d69 100644
 +		}
 +	}
 +
-+	cfg = i2c_get_match_data(client);
++	cfg = (const struct dw9807_cfg *)i2c_get_match_data(client);
 +	if (cfg) {
 +		dw9807_dev->idle_pos = cfg->idle_pos;
 +		dw9807_dev->current_val = cfg->default_pos;
@@ -209,7 +250,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  	v4l2_i2c_subdev_init(&dw9807_dev->sd, client, &dw9807_ops);
  	dw9807_dev->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
  	dw9807_dev->sd.internal_ops = &dw9807_int_ops;
-@@ -203,7 +334,8 @@ static int dw9807_probe(struct i2c_client *client)
+@@ -203,7 +369,8 @@ static int dw9807_probe(struct i2c_client *client)
  	if (rval < 0)
  		goto err_cleanup;
  
@@ -219,7 +260,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  	pm_runtime_enable(&client->dev);
  	pm_runtime_idle(&client->dev);
  
-@@ -221,6 +353,10 @@ static void dw9807_remove(struct i2c_client *client)
+@@ -221,6 +388,10 @@ static void dw9807_remove(struct i2c_client *client)
  	struct v4l2_subdev *sd = i2c_get_clientdata(client);
  	struct dw9807_device *dw9807_dev = sd_to_dw9807_vcm(sd);
  
@@ -230,7 +271,7 @@ index 4148009e0e01..95deaa6a1d69 100644
  	pm_runtime_disable(&client->dev);
  
  	dw9807_subdev_cleanup(dw9807_dev);
-@@ -236,25 +372,12 @@ static int __maybe_unused dw9807_vcm_suspend(struct device *dev)
+@@ -236,25 +407,11 @@ static int __maybe_unused dw9807_vcm_suspend(struct device *dev)
  	struct i2c_client *client = to_i2c_client(dev);
  	struct v4l2_subdev *sd = i2c_get_clientdata(client);
  	struct dw9807_device *dw9807_dev = sd_to_dw9807_vcm(sd);
@@ -245,7 +286,7 @@ index 4148009e0e01..95deaa6a1d69 100644
 -		usleep_range(DW9807_CTRL_DELAY_US, DW9807_CTRL_DELAY_US + 10);
 -	}
  
- 	/* Power down */
+-	/* Power down */
 -	ret = i2c_master_send(client, tx_data, sizeof(tx_data));
 -	if (ret < 0) {
 -		dev_err(&client->dev, "I2C write CTL fail ret = %d\n", ret);
@@ -259,20 +300,20 @@ index 4148009e0e01..95deaa6a1d69 100644
  }
  
  /*
-@@ -268,31 +391,17 @@ static int  __maybe_unused dw9807_vcm_resume(struct device *dev)
+@@ -268,35 +425,13 @@ static int  __maybe_unused dw9807_vcm_resume(struct device *dev)
  	struct i2c_client *client = to_i2c_client(dev);
  	struct v4l2_subdev *sd = i2c_get_clientdata(client);
  	struct dw9807_device *dw9807_dev = sd_to_dw9807_vcm(sd);
 -	const char tx_data[2] = { DW9807_CTL_ADDR, 0x00 };
 -	int ret, val;
- 
- 	/* Power on */
+-
+-	/* Power on */
 -	ret = i2c_master_send(client, tx_data, sizeof(tx_data));
 -	if (ret < 0) {
 -		dev_err(&client->dev, "I2C write CTL fail ret = %d\n", ret);
 -		return ret;
 -	}
--
+ 
 -	for (val = dw9807_dev->current_val % DW9807_CTRL_STEPS;
 -	     val < dw9807_dev->current_val + DW9807_CTRL_STEPS - 1;
 -	     val += DW9807_CTRL_STEPS) {
@@ -289,10 +330,12 @@ index 4148009e0e01..95deaa6a1d69 100644
 +	return dw9807_active(dw9807_dev);
  }
  
- static const struct of_device_id dw9807_of_table[] = {
+-static const struct of_device_id dw9807_of_table[] = {
 -	{ .compatible = "dongwoon,dw9807-vcm" },
-+	{ .compatible = "dongwoon,dw9807-vcm", .data = &dw9807_cfg },
-+	{ .compatible = "dongwoon,dw9817-vcm", .data = &dw9817_cfg },
- 	/* Compatibility for older firmware, NEVER USE THIS IN FIRMWARE! */
- 	{ .compatible = "dongwoon,dw9807" },
- 	{ /* sentinel */ }
+-	/* Compatibility for older firmware, NEVER USE THIS IN FIRMWARE! */
+-	{ .compatible = "dongwoon,dw9807" },
+-	{ /* sentinel */ }
+-};
+ MODULE_DEVICE_TABLE(of, dw9807_of_table);
+ 
+ static const struct dev_pm_ops dw9807_pm_ops = {
