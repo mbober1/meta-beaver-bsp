@@ -30,11 +30,6 @@ SRC_URI:append:radxa-zero-3e-custom = " \
 	file://radxa-zero-3e/rk3566-trim.cfg \
 "
 
-DEPENDS:append:luckfox-lyra-plus = " lz4-native"
-DEPENDS:append:radxa-zero-3e-custom = " lzop-native"
-
-FIT_KERNEL_COMP_ALG:radxa-zero-3e-custom = "lzo"
-FIT_KERNEL_COMP_ALG_EXTENSION:radxa-zero-3e-custom = ".lzo"
-
-INSANE_SKIP:${PN}-src += "buildpaths"
-
+SRC_URI:append:stm32mp15-disco = " \
+	file://stm32mp1/stm32mp1-trim.cfg \
+"
