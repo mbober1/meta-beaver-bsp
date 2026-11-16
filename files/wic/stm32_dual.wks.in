@@ -1,0 +1,16 @@
+#   Partition   Description
+#   loader1     (U-Boot SPL)
+#   loader2     (U-Boot proper)
+#   rootfsA     (active slot)
+#   rootfsB     (update slot)
+#   swap        (swap)
+#   data        (persistent data)
+
+part loader1  --size 256k               --ondisk mmcblk --align 1     --part-name fsbl1     --source rawcopy        --sourceparams="file=u-boot-spl.stm32"
+part loader2  --size 2M                 --ondisk mmcblk --align 1     --part-name ssbl      --source rawcopy        --sourceparams="file=u-boot.img"      
+part /        --label rootfsA --active  --ondisk mmcblk --fstype=ext4 --part-name rootfsA   --source rootfs         --size=${OTA_ROOTFS_SIZE}
+part /        --label rootfsB           --ondisk mmcblk --fstype=ext4 --part-name rootfsB   --source rootfs         --size=${OTA_ROOTFS_SIZE}
+part swap     --label swap              --ondisk mmcblk --fstype=swap --part-name swap      --part-type ${SWAP_DPS} --size=${OTA_SWAP_SIZE}
+part /data    --label data              --ondisk mmcblk --fstype=ext4 --part-name data      --use-label             --size=${OTA_DATA_SIZE}
+
+bootloader --ptable gpt

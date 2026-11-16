@@ -1,0 +1,10 @@
+#   Partition   Description
+#   loader1     (U-Boot SPL)
+#   loader2     (U-Boot proper)
+#   rootfsA     (system)
+
+part loader1  --size 256k               --ondisk mmcblk --align 1     --part-name fsbl1     --source rawcopy --sourceparams="file=u-boot-spl.stm32"
+part loader2  --size 2M                 --ondisk mmcblk --align 1     --part-name ssbl      --source rawcopy --sourceparams="file=u-boot.img"      
+part /        --label rootfsA --active  --ondisk mmcblk --fstype=ext4 --part-name rootfsA   --source rootfs
+
+bootloader --ptable gpt
