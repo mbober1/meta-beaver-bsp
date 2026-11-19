@@ -1,0 +1,13 @@
+#   Partition   Start Sector    Description
+#   tispl       1024            (R5 SPL, raw, SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR=0x400)
+#   uboot       5120            (A53 SPL, raw, SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR=0x1400)
+#   tiboot3     8192            (ROM redundant image at 0x400000)
+#   rootfs     16384            (active slot)
+
+part tispl    --offset 1024s  --fixed-size 2M    --fstype=none --no-table --source rawcopy --sourceparams="file=tispl.bin"
+part uboot    --offset 5120s  --fixed-size 1536K --fstype=none --no-table --source rawcopy --sourceparams="file=u-boot.img"
+part tiboot3  --offset 8192s  --fixed-size 512K  --fstype=none --no-table --source rawcopy --sourceparams="file=tiboot3.bin"
+
+part /        --label rootfsA --active  --fstype=ext4 --part-name rootfsA   --source rootfs --size=${OTA_ROOTFS_SIZE} --offset 16384s 
+
+bootloader --ptable gpt
