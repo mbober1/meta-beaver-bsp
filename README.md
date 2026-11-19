@@ -1,10 +1,11 @@
 # Machine meta layer for Yocto Project
 
 ## Supported hardware
-- Radxa Rock 5B+
-- Radxa Zero 3E
-- Luckfox Lyra Plus
-- STM32MP157C-DK2
+- Radxa Rock 5B+ (RK3588)
+- Radxa Zero 3E (RK3566)
+- Luckfox Lyra Plus (RK3506)
+- STM32MP157C-DK2 (STM32MP157C)
+- BeagleY-AI (AM67A)
 
 
 ## Dependencies

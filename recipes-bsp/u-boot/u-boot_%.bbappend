@@ -1,5 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
+inherit u-boot-k3-firmware
+
 SRC_URI:append = "\
 	file://env.cfg \
 	file://decompression.cfg \
@@ -10,6 +12,7 @@ SRC_URI:append:rock-5b-plus = " file://bootcmd_emmc.cfg"
 SRC_URI:append:radxa-zero-3e-custom = " file://bootcmd_sdcard.cfg"
 SRC_URI:append:stm32mp15-disco = " file://bootcmd_emmc.cfg"
 SRC_URI:append:rk3506 = " file://bootcmd_emmc.cfg"
+SRC_URI:append:beagley-ai = " file://bootcmd_sdcard.cfg"
 
 BRANCH:rk3506 = "main"
 SRCREV:rk3506 = "ede4c80c159acfd6038255c88922993fbde16d93"
@@ -33,9 +36,3 @@ SRC_URI:append:rk3506 = "\
 
 ROCKCHIP_TEE:closed-tpl:rk3506 = "${DEPLOY_DIR_IMAGE}/tee-rk3506.bin"
 EXTRA_OEMAKE:append:closed-tpl:rk3506 = " TEE=${ROCKCHIP_TEE}"
-
-
-BRANCH:stmp157-olinuxino-lime2 = "release-20250305"
-SRC_URI:stmp157-olinuxino-lime2 = "git://github.com/OLIMEX/u-boot-olinuxino.git;protocol=https;branch=${BRANCH}"
-SRCREV:stmp157-olinuxino-lime2 = "23d8f769a94ae230b7a68fa812cc3c4dc0cbf1c9"
-

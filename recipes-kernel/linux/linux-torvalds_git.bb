@@ -33,3 +33,7 @@ SRC_URI:append:radxa-zero-3e-custom = " \
 SRC_URI:append:stm32mp15-disco = " \
 	file://stm32mp1/stm32mp1-trim.cfg \
 "
+
+SRC_URI:append:beagley-ai = " \
+	file://beagley-ai/beagley-ai-trim.cfg \
+"
